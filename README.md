@@ -20,8 +20,9 @@ Your services are running and can be accessible by your ci/cd pipline using thes
 
 # Example workflow 
 That is an example workflow, which you can extend based on your use-case to address your machine learning problem following MLOps process model.
-workflow:
 ```
+workflow:
+
 stages:
   - build-images
   - data
