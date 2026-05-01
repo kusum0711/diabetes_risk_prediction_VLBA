@@ -1,0 +1,11 @@
+# Data + ML
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+
+
+# Config
+pyyaml
+
