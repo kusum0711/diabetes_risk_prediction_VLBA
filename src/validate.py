@@ -1,5 +1,3 @@
-# src/pipeline/validate.py
-
 import pandas as pd
 
 EXPECTED_COLUMNS = [
