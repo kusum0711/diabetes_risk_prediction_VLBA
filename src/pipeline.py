@@ -1,6 +1,6 @@
-from src.load import load_data
-from src.validate import validate_data
-from src.clean import clean_data
+from src.preprocess import load_data
+from src.preprocess import validate_data
+from src.preprocess import clean_data
 from src.features import engineer_features
 from src.store import save_data
 
