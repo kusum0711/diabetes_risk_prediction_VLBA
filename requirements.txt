@@ -4,6 +4,8 @@ pandas
 scikit-learn
 matplotlib
 seaborn
+pyarrow
+feast
 
 
 # Config

@@ -1,0 +1,79 @@
+
+n
+N
+patientUnique patient row identifier"
+patient_idJdiabetes_risk_prediction
+¯ãæÏØ©Š†¯ãæÏØ©Š†
+O
+/
+__dummy"
+__dummy_idJdiabetes_risk_prediction
+¯ãæÏØ×Î†¯ãæÏØ×Î†1"$d1dfcb2b-dd92-45af-9fa7-9d087e819563*¯ãæÏˆÔÄˆ2Ý
+¼
+diabetes_featuresdiabetes_risk_predictionpatient"
+
+HighBP"
+HighChol"
+BMI"
+
+Smoker"
+
+Stroke"
+HeartDiseaseorAttack"
+PhysActivity"
+
+Fruits"
+Veggies"
+HvyAlcoholConsump"
+NoDocbcCost"
+GenHlth"
+MentHlth"
+PhysHlth"
+DiffWalk"
+Sex"
+Age"
+	Education"
+
+Income"
+BMI_cat2€†°–:Çevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquet’¯ãæÏÈ×›»"¯ãæÏ€‡°…@b
+
+patient_id’latest
+¯ãæÏà¦•‡¯ãæÏà¦•‡Ry
+w
+,feast.infra.online_stores.sqlite.SqliteTable"G
+/app/data/online_store.db*diabetes_risk_prediction_diabetes_featuresbâevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquetªdiabetes_risk_prediction’¯ãæÏÈ×›»"¯ãæÏ€‡°…Š:
+
+diabetes_risk_prediction
+¯ãæÏÈ‰²¼¯ãæÏÈ‰²¼’Ò
+Ï
+diabetes_featuresdiabetes_risk_prediction"feature_view*Ý
+¼
+diabetes_featuresdiabetes_risk_predictionpatient"
+
+HighBP"
+HighChol"
+BMI"
+
+Smoker"
+
+Stroke"
+HeartDiseaseorAttack"
+PhysActivity"
+
+Fruits"
+Veggies"
+HvyAlcoholConsump"
+NoDocbcCost"
+GenHlth"
+MentHlth"
+PhysHlth"
+DiffWalk"
+Sex"
+Age"
+	Education"
+
+Income"
+BMI_cat2€†°–:Çevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquet’¯ãæÏÈ×›»"¯ãæÏ€‡°…@b
+
+patient_id’latest
+¯ãæÏà¦•‡¯ãæÏà¦•‡2¯ãæÏèý‚ˆB$a84197e9-84b2-420c-bccf-6e4c5171f49d

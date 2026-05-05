@@ -1,0 +1,30 @@
+# docs
+documents/
+
+# OS
+.DS_Store
+
+# Python environments
+.venv/
+env/
+venv/
+
+# Byte-compiled
+__pycache__/
+
+# MLflow local tracking store & artifacts
+mlruns/
+mlartifacts/
+mlflow.db
+mlflow_data/
+
+# Saved model artifacts 
+models/*.joblib
+models/*.pkl
+models/*.onnx
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+
+__pycache__/
