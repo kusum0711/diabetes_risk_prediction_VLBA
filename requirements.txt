@@ -5,9 +5,21 @@ scikit-learn
 matplotlib
 seaborn
 pyarrow
-feast
+xgboost
+imbalanced-learn
 
+# Feature Store
+feast
 
 # Config
 pyyaml
 
+# MLflow
+mlflow==2.22.0
+
+# Pipeline
+joblib
+
+# Testing
+pytest
+pytest-cov

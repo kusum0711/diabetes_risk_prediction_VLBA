@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from feast import Entity, FeatureView, Field, FileSource
-from feast.types import Float32, String
+from feast.types import Float32, Int64, String
 
 
 patient = Entity(
@@ -40,6 +40,8 @@ diabetes_feature_view = FeatureView(
         Field(name="Education", dtype=Float32),
         Field(name="Income", dtype=Float32),
         Field(name="BMI_cat", dtype=String),
+        Field(name="Total_Unhealthy_Days", dtype=Int64),
+        Field(name="Age_cat", dtype=String),
     ],
     source=diabetes_source,
 )

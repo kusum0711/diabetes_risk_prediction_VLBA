@@ -8,8 +8,8 @@ O
 /
 __dummy"
 __dummy_idJdiabetes_risk_prediction
-¯ãæÏØ×Î†¯ãæÏØ×Î†1"$d1dfcb2b-dd92-45af-9fa7-9d087e819563*¯ãæÏˆÔÄˆ2İ
-¼
+¯ãæÏØ×Î†¯ãæÏØ×Î†1"$a4bfcb50-69e3-4234-9913-1ace85e53373*Òñ±Ğ¸º¿ï2ú
+Ú
 diabetes_featuresdiabetes_risk_predictionpatient"
 
 HighBP"
@@ -35,10 +35,12 @@ __dummy_idJdiabetes_risk_prediction
 	Education"
 
 Income"
-BMI_cat2€†°–:Çevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquet’¯ãæÏÈ×›»"¯ãæÏ€‡°…@b
+BMI_cat"
+Total_Unhealthy_Days"
+Age_cat2€†°–:Çevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquet’ç«ĞèğÜ "ç«ĞèğÜ @b
 
-patient_id’latest
-¯ãæÏà¦•‡¯ãæÏà¦•‡Ry
+patient_id
+¯ãæÏà¦•‡è«Ğóº.Ry
 w
 ,feast.infra.online_stores.sqlite.SqliteTable"G
 /app/data/online_store.db*diabetes_risk_prediction_diabetes_featuresbâevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquetªdiabetes_risk_prediction’¯ãæÏÈ×›»"¯ãæÏ€‡°…Š:
