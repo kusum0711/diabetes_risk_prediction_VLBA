@@ -1,0 +1,29 @@
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow_data:/mlflow
+
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+
+  diabetes-app: 
+    build: .
+    container_name: diabetes-app
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
+    depends_on:
+      - mlflow
+    command: >
+      bash -c "sleep 15 && python -m src.main"

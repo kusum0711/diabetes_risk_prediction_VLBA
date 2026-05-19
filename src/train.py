@@ -1,0 +1,458 @@
+import time
+import mlflow
+import mlflow.sklearn
+import mlflow.xgboost
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from pathlib import Path
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import StandardScaler
+
+from sklearn.model_selection import (
+    train_test_split,
+    GridSearchCV,
+    StratifiedKFold,
+)
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
+
+from sklearn.dummy import DummyClassifier
+
+from imblearn.over_sampling import SMOTE
+from xgboost import XGBClassifier
+
+from src.evaluate import (
+    compute_metrics,
+    detect_overfitting,
+    save_confusion_matrix,
+    evaluate_hypotheses,
+)
+
+
+
+# ── Data Preparation ──────────────────────────────────────────────────────────
+def prepare_data(df, config):
+    target = config["model"]["target_column"]
+    drop_cols = [target, "patient_id", "event_timestamp"]
+    drop_cols = [c for c in drop_cols if c in df.columns]
+
+    X = df.drop(columns=drop_cols)
+    y = df[target]
+ 
+    X = encode_categorical_features(X)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=config["model"]["test_size"],
+        random_state=config["model"]["random_state"],
+        stratify=y,
+    )
+
+    print(f"Train size: {X_train.shape} | Test size: {X_test.shape}")
+    print(f"Class distribution (train):\n{y_train.value_counts()}")
+    return X_train, X_test, y_train, y_test
+
+
+def encode_categorical_features(X: pd.DataFrame) -> pd.DataFrame:
+    categorical_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+    if categorical_cols:
+        print(f"🔧 Encoding categorical features: {categorical_cols}")
+        X = pd.get_dummies(X, columns=categorical_cols, drop_first=True)
+        print(f"✅ Encoded features shape: {X.shape}")
+    return X
+
+# ── SMOTE ─────────────────────────────────────────────────────────────────────
+def apply_smote(X_train, y_train, config):
+    if not config["model"].get("use_smote", True):
+        print("⏭️  SMOTE disabled in config.")
+        return X_train, y_train
+
+    print("\n📊 Class distribution BEFORE SMOTE:")
+    print(pd.Series(y_train).value_counts())
+
+    smote = SMOTE(
+        sampling_strategy={1: 20000, 2: 50000},  # targeted oversampling
+        random_state=config["model"]["random_state"]
+    )
+    X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
+
+    # Convert back to DataFrame/Series with reset index
+    feature_names = X_train.columns.tolist()
+    X_resampled = pd.DataFrame(X_resampled, columns=feature_names).reset_index(drop=True)
+    y_resampled = pd.Series(y_resampled, name=y_train.name).reset_index(drop=True)
+
+    print("\n📊 Class distribution AFTER SMOTE:")
+    print(y_resampled.value_counts())
+
+    return X_resampled, y_resampled
+
+
+# ── Scaling ───────────────────────────────────────────────────────────────────
+def scale_features(X_train, X_test):
+    feature_names = X_train.columns.tolist()
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # Keep as DataFrame for feature importance later
+    X_train_scaled = pd.DataFrame(
+        X_train_scaled,
+        columns=feature_names,
+    ).reset_index(drop=True)
+
+    X_test_scaled = pd.DataFrame(
+        X_test_scaled,
+        columns=feature_names,
+    ).reset_index(drop=True)
+
+    print("✅ Features scaled with StandardScaler.")
+    return X_train_scaled, X_test_scaled, scaler
+
+
+
+
+
+# ── Baseline ──────────────────────────────────────────────────────────────────
+def train_baseline(X_train, X_test, y_train, y_test, config):
+    print("\n--- Baseline: Dummy Classifier ---")
+
+    dummy = DummyClassifier(
+        strategy="most_frequent",
+        random_state=config["model"]["random_state"],
+    )
+    dummy.fit(X_train, y_train)
+    y_pred = dummy.predict(X_test)
+
+    y_test_reset = pd.Series(y_test).reset_index(drop=True)
+
+    baseline_acc = accuracy_score(y_test_reset, y_pred)
+    baseline_recall = recall_score(
+        y_test_reset, y_pred, average="macro", zero_division=0
+    )
+    baseline_f1 = f1_score(
+        y_test_reset, y_pred, average="macro", zero_division=0
+    )
+
+    print(f"  Baseline Accuracy: {baseline_acc:.4f}")
+    print(f"  Baseline Recall:   {baseline_recall:.4f}")
+    print(f"  Baseline F1:       {baseline_f1:.4f}")
+
+    return {
+        "baseline_accuracy": baseline_acc,
+        "baseline_recall": baseline_recall,
+        "baseline_f1": baseline_f1,
+    }
+
+
+
+
+
+
+
+
+# ── Model Definitions ─────────────────────────────────────────────────────────
+def get_models(config):
+    models = {}
+    cfg = config["models"]
+    random_state = config["model"]["random_state"]
+
+    if cfg["logistic_regression"]["enabled"]:
+        models["logistic_regression"] = {
+            "model": LogisticRegression(random_state=random_state, class_weight="balanced"),
+            "param_grid": cfg["logistic_regression"]["param_grid"],
+        }
+
+    if cfg["random_forest"]["enabled"]:
+        models["random_forest"] = {
+            "model": RandomForestClassifier(random_state=random_state, class_weight="balanced"),
+            "param_grid": cfg["random_forest"]["param_grid"],
+        }
+
+    if cfg["decision_tree"]["enabled"]:
+        models["decision_tree"] = {
+            "model": DecisionTreeClassifier(random_state=random_state, class_weight="balanced"),
+            "param_grid": cfg["decision_tree"]["param_grid"],
+        }
+
+    if cfg["xgboost"]["enabled"]:
+        models["xgboost"] = {
+            "model": XGBClassifier(
+                random_state=random_state,
+                eval_metric="mlogloss",
+                objective="multi:softprob",
+                num_class=3,
+                verbosity=0,
+            ),
+            "param_grid": cfg["xgboost"]["param_grid"],
+        }
+
+    return models
+
+# ── Feature Importance ────────────────────────────────────────────────────────
+def save_feature_importance(
+    model,
+    model_name,
+    X_train,
+    reports_dir,
+):
+    """
+    Save feature importance report.
+    """
+
+    if not hasattr(model, "feature_importances_"):
+        return None
+
+    fi_df = pd.DataFrame({
+        "feature": X_train.columns,
+        "importance": model.feature_importances_,
+    }).sort_values(
+        "importance",
+        ascending=False,
+    )
+
+    fi_path = (
+        reports_dir /
+        f"feature_importance_{model_name}.csv"
+    )
+
+    fi_df.to_csv(fi_path, index=False)
+
+    print(f"✅ Feature importance saved: {fi_path}")
+
+    return fi_df, fi_path
+
+# ── Train Single Model ────────────────────────────────────────────────────────
+def train_model(
+    name,
+    model_def,
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+    config,
+    baseline_metrics,
+    reports_dir,
+    hypothesis_results,
+):
+    print(f"\n{'='*60}")
+    print(f"  Training: {name}")
+    print(f"{'='*60}")
+
+    mlflow.set_experiment(config["mlflow"]["experiment_name"])
+
+    cv = StratifiedKFold(
+        n_splits=config["model"]["cv_folds"],
+        shuffle=True,
+        random_state=config["model"]["random_state"],
+    )
+
+    grid_search = GridSearchCV(
+        estimator=model_def["model"],
+        param_grid=model_def["param_grid"],
+        cv=cv,
+        scoring="f1_macro",  # primary metric is recall (healthcare)
+        n_jobs=-1,
+        verbose=1,
+    )
+
+    with mlflow.start_run(run_name=name):
+
+        # ── Train ──
+        start_time = time.time()
+        grid_search.fit(X_train, y_train)
+        training_time = time.time() - start_time
+
+        best_model = grid_search.best_estimator_
+        best_params = grid_search.best_params_
+
+        print(f"  Best Params: {best_params}")
+        print(f"  Training Time: {training_time:.2f}s")
+
+        # ── Metrics ──
+        train_metrics, _ = compute_metrics(
+            best_model, X_train, y_train, prefix="train_"
+        )
+        test_metrics, y_pred = compute_metrics(
+            best_model, X_test, y_test, prefix="test_"
+        )
+
+        # ── Overfitting ──
+        acc_gap, is_overfitting = detect_overfitting(
+            train_metrics, test_metrics
+        )
+
+        # ── Confusion Matrix ──
+        y_test_reset = pd.Series(y_test).reset_index(drop=True)
+        cm = confusion_matrix(y_test_reset, y_pred)
+        cm_path = save_confusion_matrix(cm, name, reports_dir)
+
+
+        fi_output = save_feature_importance(
+            best_model,
+            name,
+            X_train,
+            reports_dir,
+        )
+
+        if fi_output:
+
+            fi_df, fi_path = fi_output
+
+            mlflow.log_artifact(str(fi_path))
+
+            h_results = evaluate_hypotheses(
+                name,
+                fi_df["feature"].tolist(),
+                fi_df["importance"].tolist(),
+            )
+
+            hypothesis_results.extend(h_results)
+
+        # ── Log to MLflow ──
+        mlflow.log_params(best_params)
+        mlflow.log_metrics(train_metrics)
+        mlflow.log_metrics(test_metrics)
+        mlflow.log_metric("training_time_seconds", training_time)
+        mlflow.log_metric("accuracy_overfitting_gap", acc_gap)
+        mlflow.log_metric("baseline_accuracy", baseline_metrics["baseline_accuracy"])
+        mlflow.log_metric("baseline_recall", baseline_metrics["baseline_recall"])
+        mlflow.log_param("is_overfitting", str(is_overfitting))
+        mlflow.log_param("model_name", name)
+        mlflow.log_artifact(str(cm_path))
+
+        # ── Model Report ──
+        model_report = {
+            "model_name": name,
+            "best_params": str(best_params),
+            "training_time_seconds": round(training_time, 2),
+            **train_metrics,
+            **test_metrics,
+            "accuracy_overfitting_gap": round(acc_gap, 4),
+            "is_overfitting": is_overfitting,
+            "baseline_accuracy": round(baseline_metrics["baseline_accuracy"], 4),
+            "baseline_recall": round(baseline_metrics["baseline_recall"], 4),
+            "beats_baseline_accuracy": test_metrics["test_accuracy"] > baseline_metrics["baseline_accuracy"],
+            "beats_baseline_recall": test_metrics["test_recall_macro"] > baseline_metrics["baseline_recall"],
+        }
+
+        report_path = reports_dir / f"model_report_{name}.csv"
+        pd.DataFrame([model_report]).to_csv(report_path, index=False)
+        mlflow.log_artifact(str(report_path))
+        print(f"  📄 Model report saved: {report_path}")
+
+        # ── Register Model ──
+        if name == "xgboost":
+            mlflow.xgboost.log_model(
+                best_model,
+                artifact_path=name,
+                registered_model_name=f"diabetes_{name}",
+            )
+        else:
+            mlflow.sklearn.log_model(
+                best_model,
+                artifact_path=name,
+                registered_model_name=f"diabetes_{name}",
+            )
+
+        print(f"  ✅ {name} logged and registered in MLflow.")
+
+        return {
+            "model_name": name,
+            "best_model": best_model,
+            "best_params": best_params,
+            "train_metrics": train_metrics,
+            "test_metrics": test_metrics,
+            "training_time": training_time,
+            "acc_overfitting_gap": acc_gap,
+            "is_overfitting": is_overfitting,
+            "confusion_matrix": cm,
+            "model_report": model_report,
+        }
+
+
+# ── Main Entry Point ──────────────────────────────────────────────────────────
+def run_training(df, config):
+
+    mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
+
+    reports_dir = Path("reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Load & Prepare ──
+    X_train, X_test, y_train, y_test = prepare_data(df, config)
+
+    # ── SMOTE ──
+    X_train, y_train = apply_smote(X_train, y_train, config)
+
+    # ── Scale ──
+    X_train, X_test, scaler = scale_features(X_train, X_test)
+
+    # ── Baseline ──
+    baseline_metrics = train_baseline(X_train, X_test, y_train, y_test, config)
+
+    # ── Train All Models ──
+    models = get_models(config)
+    results = []
+    hypothesis_results = []
+
+    for name, model_def in models.items():
+        result = train_model(
+            name=name,
+            model_def=model_def,
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            config=config,
+            baseline_metrics=baseline_metrics,
+            reports_dir=reports_dir,
+            hypothesis_results=hypothesis_results,
+        )
+        results.append(result)
+
+    # ── Model Assessment Report ──
+    assessment_df = pd.DataFrame([r["model_report"] for r in results])
+    assessment_path = reports_dir / "model_assessment_report.csv"
+    assessment_df.to_csv(assessment_path, index=False)
+    print(f"\n📄 Model assessment report saved: {assessment_path}")
+
+    # ── Overfitting Report ──
+    overfitting_df = assessment_df[[
+        "model_name",
+        "train_accuracy",
+        "test_accuracy",
+        "accuracy_overfitting_gap",
+        "train_recall_macro",
+        "test_recall_macro",
+        "is_overfitting",
+    ]]
+    overfitting_path = reports_dir / "overfitting_report.csv"
+    overfitting_df.to_csv(overfitting_path, index=False)
+    print(f"📄 Overfitting report saved: {overfitting_path}")
+
+    # ── Hypothesis Report ──
+    if hypothesis_results:
+        hypothesis_df = pd.DataFrame(hypothesis_results)
+        hypothesis_path = reports_dir / "hypothesis_report.csv"
+        hypothesis_df.to_csv(hypothesis_path, index=False)
+        print(f"📄 Hypothesis report saved: {hypothesis_path}")
+
+    print("\n✅ All models trained, evaluated, and logged to MLflow.")
+    return results
+
+
+if __name__ == "__main__":
+    run_training()
