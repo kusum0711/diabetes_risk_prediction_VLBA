@@ -41,7 +41,7 @@ from src.evaluate import (
 
 
 
-# ── Data Preparation ──────────────────────────────────────────────────────────
+# Data Preparation 
 def prepare_data(df, config):
     target = config["model"]["target_column"]
     drop_cols = [target, "patient_id", "event_timestamp"]
@@ -70,16 +70,16 @@ def encode_categorical_features(X: pd.DataFrame) -> pd.DataFrame:
     if categorical_cols:
         print(f"🔧 Encoding categorical features: {categorical_cols}")
         X = pd.get_dummies(X, columns=categorical_cols, drop_first=True)
-        print(f"✅ Encoded features shape: {X.shape}")
+        print(f"  Encoded features shape: {X.shape}")
     return X
 
-# ── SMOTE ─────────────────────────────────────────────────────────────────────
+# SMOTE
 def apply_smote(X_train, y_train, config):
     if not config["model"].get("use_smote", True):
         print("⏭️  SMOTE disabled in config.")
         return X_train, y_train
 
-    print("\n📊 Class distribution BEFORE SMOTE:")
+    print("\n  Class distribution BEFORE SMOTE:")
     print(pd.Series(y_train).value_counts())
 
     smote = SMOTE(
@@ -93,13 +93,13 @@ def apply_smote(X_train, y_train, config):
     X_resampled = pd.DataFrame(X_resampled, columns=feature_names).reset_index(drop=True)
     y_resampled = pd.Series(y_resampled, name=y_train.name).reset_index(drop=True)
 
-    print("\n📊 Class distribution AFTER SMOTE:")
+    print("\n  Class distribution AFTER SMOTE:")
     print(y_resampled.value_counts())
 
     return X_resampled, y_resampled
 
 
-# ── Scaling ───────────────────────────────────────────────────────────────────
+# Scaling 
 def scale_features(X_train, X_test):
     feature_names = X_train.columns.tolist()
 
@@ -107,7 +107,6 @@ def scale_features(X_train, X_test):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # Keep as DataFrame for feature importance later
     X_train_scaled = pd.DataFrame(
         X_train_scaled,
         columns=feature_names,
@@ -118,14 +117,14 @@ def scale_features(X_train, X_test):
         columns=feature_names,
     ).reset_index(drop=True)
 
-    print("✅ Features scaled with StandardScaler.")
+    print("  Features scaled with StandardScaler.")
     return X_train_scaled, X_test_scaled, scaler
 
 
 
 
 
-# ── Baseline ──────────────────────────────────────────────────────────────────
+# Baseline 
 def train_baseline(X_train, X_test, y_train, y_test, config):
     print("\n--- Baseline: Dummy Classifier ---")
 
@@ -157,13 +156,7 @@ def train_baseline(X_train, X_test, y_train, y_test, config):
     }
 
 
-
-
-
-
-
-
-# ── Model Definitions ─────────────────────────────────────────────────────────
+# Model Definitions 
 def get_models(config):
     models = {}
     cfg = config["models"]
@@ -201,7 +194,7 @@ def get_models(config):
 
     return models
 
-# ── Feature Importance ────────────────────────────────────────────────────────
+# Feature Importance 
 def save_feature_importance(
     model,
     model_name,
@@ -230,11 +223,11 @@ def save_feature_importance(
 
     fi_df.to_csv(fi_path, index=False)
 
-    print(f"✅ Feature importance saved: {fi_path}")
+    print(f"  Feature importance saved: {fi_path}")
 
     return fi_df, fi_path
 
-# ── Train Single Model ────────────────────────────────────────────────────────
+# Train Single Model 
 def train_model(
     name,
     model_def,
@@ -263,7 +256,7 @@ def train_model(
         estimator=model_def["model"],
         param_grid=model_def["param_grid"],
         cv=cv,
-        scoring="f1_macro",  # primary metric is recall (healthcare)
+        scoring="f1_macro",  # primary metric is recall
         n_jobs=-1,
         verbose=1,
     )
@@ -281,7 +274,7 @@ def train_model(
         print(f"  Best Params: {best_params}")
         print(f"  Training Time: {training_time:.2f}s")
 
-        # ── Metrics ──
+        #  Metrics 
         train_metrics, _ = compute_metrics(
             best_model, X_train, y_train, prefix="train_"
         )
@@ -289,12 +282,12 @@ def train_model(
             best_model, X_test, y_test, prefix="test_"
         )
 
-        # ── Overfitting ──
+        #  Overfitting 
         acc_gap, is_overfitting = detect_overfitting(
             train_metrics, test_metrics
         )
 
-        # ── Confusion Matrix ──
+        #  Confusion Matrix 
         y_test_reset = pd.Series(y_test).reset_index(drop=True)
         cm = confusion_matrix(y_test_reset, y_pred)
         cm_path = save_confusion_matrix(cm, name, reports_dir)
@@ -321,7 +314,7 @@ def train_model(
 
             hypothesis_results.extend(h_results)
 
-        # ── Log to MLflow ──
+        #  Log to MLflow 
         mlflow.log_params(best_params)
         mlflow.log_metrics(train_metrics)
         mlflow.log_metrics(test_metrics)
@@ -333,7 +326,7 @@ def train_model(
         mlflow.log_param("model_name", name)
         mlflow.log_artifact(str(cm_path))
 
-        # ── Model Report ──
+        #  Model Report 
         model_report = {
             "model_name": name,
             "best_params": str(best_params),
@@ -353,7 +346,7 @@ def train_model(
         mlflow.log_artifact(str(report_path))
         print(f"  📄 Model report saved: {report_path}")
 
-        # ── Register Model ──
+        #  Register Model 
         if name == "xgboost":
             mlflow.xgboost.log_model(
                 best_model,
@@ -367,7 +360,7 @@ def train_model(
                 registered_model_name=f"diabetes_{name}",
             )
 
-        print(f"  ✅ {name} logged and registered in MLflow.")
+        print(f"    {name} logged and registered in MLflow.")
 
         return {
             "model_name": name,
@@ -383,7 +376,7 @@ def train_model(
         }
 
 
-# ── Main Entry Point ──────────────────────────────────────────────────────────
+#  Main Entry Point
 def run_training(df, config):
 
     mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
@@ -391,19 +384,19 @@ def run_training(df, config):
     reports_dir = Path("reports")
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Load & Prepare ──
+    #  Load & Prepare ─
     X_train, X_test, y_train, y_test = prepare_data(df, config)
 
-    # ── SMOTE ──
+    #  SMOTE 
     X_train, y_train = apply_smote(X_train, y_train, config)
 
-    # ── Scale ──
+    #  Scale 
     X_train, X_test, scaler = scale_features(X_train, X_test)
 
-    # ── Baseline ──
+    #  Baseline 
     baseline_metrics = train_baseline(X_train, X_test, y_train, y_test, config)
 
-    # ── Train All Models ──
+    #  Train All Models 
     models = get_models(config)
     results = []
     hypothesis_results = []
@@ -423,13 +416,13 @@ def run_training(df, config):
         )
         results.append(result)
 
-    # ── Model Assessment Report ──
+    #  Model Assessment Report 
     assessment_df = pd.DataFrame([r["model_report"] for r in results])
     assessment_path = reports_dir / "model_assessment_report.csv"
     assessment_df.to_csv(assessment_path, index=False)
     print(f"\n📄 Model assessment report saved: {assessment_path}")
 
-    # ── Overfitting Report ──
+    #  Overfitting Report 
     overfitting_df = assessment_df[[
         "model_name",
         "train_accuracy",
@@ -443,14 +436,14 @@ def run_training(df, config):
     overfitting_df.to_csv(overfitting_path, index=False)
     print(f"📄 Overfitting report saved: {overfitting_path}")
 
-    # ── Hypothesis Report ──
+    #  Hypothesis Report 
     if hypothesis_results:
         hypothesis_df = pd.DataFrame(hypothesis_results)
         hypothesis_path = reports_dir / "hypothesis_report.csv"
         hypothesis_df.to_csv(hypothesis_path, index=False)
         print(f"📄 Hypothesis report saved: {hypothesis_path}")
 
-    print("\n✅ All models trained, evaluated, and logged to MLflow.")
+    print("\n  All models trained, evaluated, and logged to MLflow.")
     return results
 
 

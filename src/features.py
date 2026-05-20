@@ -24,7 +24,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         labels=bmi_labels,
     )
 
-    print("✅ BMI category feature created")
+    print("  BMI category feature created")
 
     # =====================================================
     # Total Unhealthy Days
@@ -35,7 +35,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         df["PhysHlth"]
     )
 
-    print("✅ Total_Unhealthy_Days feature created")
+    print("  Total_Unhealthy_Days feature created")
 
     # =====================================================
     # Age Categories
@@ -55,6 +55,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         labels=age_labels,
     )
 
-    print("✅ Age category feature created")
+    print("  Age category feature created")
 
     return df

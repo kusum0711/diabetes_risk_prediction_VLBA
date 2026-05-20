@@ -34,9 +34,9 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
     env_uri = os.environ.get("MLFLOW_TRACKING_URI")
     if env_uri:
         config["mlflow"]["tracking_uri"] = env_uri
-        print(f"✅ MLflow URI overridden from environment: {env_uri}")
+        print(f"  MLflow URI overridden from environment: {env_uri}")
 
-    print(f"✅ Config loaded from: {path}")
+    print(f"  Config loaded from: {path}")
     return config
 
 

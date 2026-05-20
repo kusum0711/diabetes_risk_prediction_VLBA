@@ -10,7 +10,7 @@ from sklearn.metrics import (
 )
 import pandas as pd
 import matplotlib.pyplot as plt
-# ── Hypotheses to track ───────────────────────────────────────────────────────
+
 
 
 def compute_metrics(model, X, y, prefix=""):
@@ -19,8 +19,7 @@ def compute_metrics(model, X, y, prefix=""):
 
     y = pd.Series(y).reset_index(drop=True)
 
-    # ── Print detailed class metrics ──
-    print(f"\n📊 Classification Report ({prefix})")
+    print(f"\n  Classification Report ({prefix})")
     print(
         classification_report(
             y,
@@ -31,10 +30,10 @@ def compute_metrics(model, X, y, prefix=""):
     )
 
     metrics = {
-        # ── Standard Metrics ──
+        # Standard Metrics
         f"{prefix}accuracy": accuracy_score(y, y_pred),
 
-        # ── Weighted Metrics ──
+        # Weighted Metrics
         f"{prefix}precision_weighted": precision_score(
             y, y_pred,
             average="weighted",
@@ -53,7 +52,7 @@ def compute_metrics(model, X, y, prefix=""):
             zero_division=0
         ),
 
-        # ── Macro Metrics (IMPORTANT) ──
+        #  Macro Metrics
         f"{prefix}precision_macro": precision_score(
             y, y_pred,
             average="macro",
@@ -72,7 +71,7 @@ def compute_metrics(model, X, y, prefix=""):
             zero_division=0
         ),
 
-        # ── ROC AUC ──
+        #  ROC AUC 
         f"{prefix}auc_roc": roc_auc_score(
             y,
             y_proba,
@@ -84,7 +83,8 @@ def compute_metrics(model, X, y, prefix=""):
     return metrics, y_pred
 
 
-    # ── Overfitting Detection ─────────────────────────────────────────────────────
+# Overfitting Detection 
+
 def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
 
     train_acc = train_metrics["train_accuracy"]
@@ -109,12 +109,12 @@ def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
             f"Gap exceeds threshold ({threshold})"
         )
     else:
-        print("  ✅ No significant overfitting detected.")
+        print("    No significant overfitting detected.")
 
     return acc_gap, is_overfitting
 
 
-# ── Confusion Matrix ──────────────────────────────────────────────────────────
+# Confusion Matrix
 def save_confusion_matrix(cm, model_name, reports_dir):
     fig, ax = plt.subplots(figsize=(8, 6))
     disp = ConfusionMatrixDisplay(
@@ -128,11 +128,11 @@ def save_confusion_matrix(cm, model_name, reports_dir):
     path = reports_dir / f"confusion_matrix_{model_name}.png"
     plt.savefig(path)
     plt.close()
-    print(f"  📊 Confusion matrix saved: {path}")
+    print(f"    Confusion matrix saved: {path}")
     return path
 
 
-# ── Hypothesis Evaluation ─────────────────────────────────────────────────────
+# Hypothesis Evaluation
 
 HYPOTHESES = {
     "H1_BMI_increases_diabetes_risk": [

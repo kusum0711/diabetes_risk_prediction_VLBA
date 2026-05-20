@@ -70,7 +70,7 @@ def run_pipeline():
         config,
     )
 
-    print("\n✅ PIPELINE COMPLETED")
+    print("\n  PIPELINE COMPLETED")
 
     return results
 

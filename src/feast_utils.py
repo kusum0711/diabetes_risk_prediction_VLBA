@@ -66,7 +66,7 @@ def create_feast_data(
 
     df.to_parquet(output_path, index=False)
 
-    print("✅ Feast feature data created")
+    print("  Feast feature data created")
 
     return df
 
@@ -85,7 +85,7 @@ def apply_feast(repo_path="feature_repo"):
         check=True,
     )
 
-    print("✅ Feast apply completed")
+    print("  Feast apply completed")
 
 
 # ---------------------------------------------------
@@ -138,7 +138,7 @@ def get_training_data(
 
     feature_df.to_csv(output_path, index=False)
 
-    print("✅ Training data retrieved from Feast")
+    print("  Training data retrieved from Feast")
     print(f"Shape: {feature_df.shape}")
 
     return feature_df
