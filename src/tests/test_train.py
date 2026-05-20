@@ -17,9 +17,8 @@ from src.evaluate import (
 )
  
 
-# =========================================================
+
 # Fixtures
-# =========================================================
 
 @pytest.fixture
 def sample_config():
@@ -123,9 +122,7 @@ def processed_data(sample_df, sample_config):
     return X_train, X_test, y_train, y_test
 
 
-# =========================================================
 # prepare_data
-# =========================================================
 
 class TestPrepareData:
 
@@ -159,9 +156,7 @@ class TestPrepareData:
         assert set(y_train.unique()) == set(y_test.unique())
 
 
-# =========================================================
 # SMOTE
-# =========================================================
 
 class TestSmote:
 
@@ -198,9 +193,7 @@ class TestSmote:
         assert list(X_res.columns) == list(X_train.columns)
 
 
-# =========================================================
 # Scaling
-# =========================================================
 
 class TestScaling:
 
@@ -213,9 +206,7 @@ class TestScaling:
         assert (means.abs() < 0.1).all()
 
 
-# =========================================================
 # Metrics
-# =========================================================
 
 class TestMetrics:
 
@@ -239,9 +230,7 @@ class TestMetrics:
             assert 0.0 <= value <= 1.0
 
 
-# =========================================================
 # Overfitting
-# =========================================================
 
 class TestOverfitting:
 
@@ -282,9 +271,7 @@ class TestOverfitting:
         assert is_overfitting is False
 
 
-# =========================================================
 # Models
-# =========================================================
 
 class TestModels:
 
@@ -298,9 +285,7 @@ class TestModels:
         assert "decision_tree" in models
 
 
-# =========================================================
 # Integration
-# =========================================================
 
 class TestIntegration:
 
