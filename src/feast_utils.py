@@ -25,9 +25,9 @@ FEATURES = [
     "diabetes_features:Age",
     "diabetes_features:Education",
     "diabetes_features:Income",
-    "diabetes_features:BMI_cat",
-    "diabetes_features:Total_Unhealthy_Days",
-    "diabetes_features:Age_cat",
+    "diabetes_features:metabolic_risk",
+    "diabetes_features:health_burden",
+    "diabetes_features:age_metabolic_risk",
 ]
 
 

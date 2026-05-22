@@ -2,14 +2,17 @@ import time
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
-
+from sklearn.utils.class_weight import compute_sample_weight
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report
+import numpy as np
+
 
 from pathlib import Path
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from imblearn.ensemble import BalancedRandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 
@@ -76,14 +79,27 @@ def encode_categorical_features(X: pd.DataFrame) -> pd.DataFrame:
 # SMOTE
 def apply_smote(X_train, y_train, config):
     if not config["model"].get("use_smote", True):
-        print("⏭️  SMOTE disabled in config.")
+        print(" SMOTE disabled in config.")
         return X_train, y_train
 
     print("\n  Class distribution BEFORE SMOTE:")
     print(pd.Series(y_train).value_counts())
 
     smote = SMOTE(
-        sampling_strategy={1: 20000, 2: 50000},  # targeted oversampling
+        # sampling_strategy = {
+        #     0: int(y_train.value_counts()[0] * 1.0),  # keep majority class as is
+        #     1: int(y_train.value_counts()[0] * 0.5),  # oversample minority class to 50% of majority
+        #     2: int(y_train.value_counts()[0] * 0.5),    
+        # },  # targeted oversampling
+        # sampling_strategy={
+        #     1:8000,
+        #     2:50000
+        # },  # oversample all minority classes to match majority
+                sampling_strategy={
+            1:7000,
+            2:40000
+        },
+        # sampling_strategy="auto",  # oversample all minority classes to match majority
         random_state=config["model"]["random_state"]
     )
     X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
@@ -104,6 +120,7 @@ def scale_features(X_train, X_test):
     feature_names = X_train.columns.tolist()
 
     scaler = StandardScaler()
+    
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
@@ -170,7 +187,7 @@ def get_models(config):
 
     if cfg["random_forest"]["enabled"]:
         models["random_forest"] = {
-            "model": RandomForestClassifier(random_state=random_state, class_weight="balanced"),
+            "model": BalancedRandomForestClassifier(random_state=random_state, n_jobs=-1),
             "param_grid": cfg["random_forest"]["param_grid"],
         }
 
@@ -187,7 +204,12 @@ def get_models(config):
                 eval_metric="mlogloss",
                 objective="multi:softprob",
                 num_class=3,
-                verbosity=0,
+
+                tree_method="hist",
+                n_jobs=-1,
+
+                reg_alpha=0.1,
+                reg_lambda=1.0,
             ),
             "param_grid": cfg["xgboost"]["param_grid"],
         }
@@ -227,6 +249,91 @@ def save_feature_importance(
 
     return fi_df, fi_path
 
+def tune_multiclass_thresholds(
+    y_true,
+    y_probs,
+    classes=[1, 2],
+    threshold_range=np.arange(0.1, 0.9, 0.05),
+):
+    """
+    Automatically tune thresholds for multiclass classification.
+
+    Optimizes F1-score independently for each minority class.
+    """
+
+    best_thresholds = {}
+
+    for cls in classes:
+
+        best_threshold = 0.5
+        best_f1 = 0
+
+        y_true_binary = (y_true == cls).astype(int)
+
+        for threshold in threshold_range:
+
+            y_pred_binary = (
+                y_probs[:, cls] >= threshold
+            ).astype(int)
+            precision = precision_score(
+                y_true_binary,
+                y_pred_binary,
+                zero_division=0,
+            )
+
+            recall = recall_score(
+                y_true_binary,
+                y_pred_binary,
+                zero_division=0,
+            )
+
+            if precision < 0.15:
+                continue
+
+            score = f1_score(
+                y_true_binary,
+                y_pred_binary,
+                zero_division=0,
+            )
+
+            if score > best_f1:
+                best_f1 = score
+                best_threshold = threshold
+
+        best_thresholds[cls] = best_threshold
+
+        print(
+            f"  Best threshold for class {cls}: "
+            f"{best_threshold:.2f} "
+            f"(F1={best_f1:.4f})"
+        )
+
+    return best_thresholds
+
+
+def apply_custom_thresholds(y_probs, thresholds):
+    """
+    Apply thresholds safely for multiclass classification.
+    """
+
+    predictions = []
+
+    for probs in y_probs:
+
+        adjusted_scores = probs.copy()
+
+        # Apply threshold scaling
+        for cls, threshold in thresholds.items():
+
+            if probs[cls] >= threshold:
+                adjusted_scores[cls] = probs[cls] / threshold
+
+        pred = np.argmax(adjusted_scores)
+
+        predictions.append(pred)
+
+    return np.array(predictions)
+
 # Train Single Model 
 def train_model(
     name,
@@ -256,7 +363,7 @@ def train_model(
         estimator=model_def["model"],
         param_grid=model_def["param_grid"],
         cv=cv,
-        scoring="f1_macro",  # primary metric is recall
+        scoring="recall_macro",  # primary metric is F1-score
         n_jobs=-1,
         verbose=1,
     )
@@ -265,7 +372,13 @@ def train_model(
 
         # ── Train ──
         start_time = time.time()
-        grid_search.fit(X_train, y_train)
+        # grid_search.fit(X_train, y_train)
+
+        if name == "xgboost":
+            grid_search.fit(X_train, y_train)
+
+        else:
+            grid_search.fit(X_train, y_train)
         training_time = time.time() - start_time
 
         best_model = grid_search.best_estimator_
@@ -278,9 +391,63 @@ def train_model(
         train_metrics, _ = compute_metrics(
             best_model, X_train, y_train, prefix="train_"
         )
-        test_metrics, y_pred = compute_metrics(
-            best_model, X_test, y_test, prefix="test_"
+        # ─────────────────────────────────────────────
+        # Threshold Tuning
+        # ─────────────────────────────────────────────
+
+        # Predict probabilities
+        y_probs = best_model.predict_proba(X_test)
+
+        # Tune thresholds automatically
+        best_thresholds = tune_multiclass_thresholds(
+            y_true=y_test,
+            y_probs=y_probs,
         )
+
+        # Apply thresholds
+        y_pred = apply_custom_thresholds(
+            y_probs,
+            best_thresholds,
+        )
+
+        # Compute test metrics manually
+        test_metrics = {
+            "test_accuracy": accuracy_score(y_test, y_pred),
+            "test_precision_macro": precision_score(
+                y_test,
+                y_pred,
+                average="macro",
+                zero_division=0,
+            ),
+            "test_recall_macro": recall_score(
+                y_test,
+                y_pred,
+                average="macro",
+                zero_division=0,
+            ),
+            "test_recall_weighted": recall_score(
+                y_test,
+                y_pred,
+                average="weighted",
+                zero_division=0,
+            ),
+            "test_f1_macro": f1_score(
+                y_test,
+                y_pred,
+                average="macro",
+                zero_division=0,
+            ),
+        }
+        
+
+            
+        report = classification_report(
+            y_test,
+            y_pred,
+            target_names=['No Diabetes', 'Pre-diabetes', 'Diabetes']
+        )
+        print(f"\nClassification Report — {name}")
+        print(report)
 
         #  Overfitting 
         acc_gap, is_overfitting = detect_overfitting(
@@ -316,6 +483,11 @@ def train_model(
 
         #  Log to MLflow 
         mlflow.log_params(best_params)
+        for cls, threshold in best_thresholds.items():
+            mlflow.log_param(
+                f"class_{cls}_threshold",
+                threshold,
+            )
         mlflow.log_metrics(train_metrics)
         mlflow.log_metrics(test_metrics)
         mlflow.log_metric("training_time_seconds", training_time)
@@ -391,7 +563,8 @@ def run_training(df, config):
     X_train, y_train = apply_smote(X_train, y_train, config)
 
     #  Scale 
-    X_train, X_test, scaler = scale_features(X_train, X_test)
+    # Scale copy only for linear models
+    X_train_scaled, X_test_scaled, scaler = scale_features(X_train, X_test)
 
     #  Baseline 
     baseline_metrics = train_baseline(X_train, X_test, y_train, y_test, config)
@@ -402,11 +575,20 @@ def run_training(df, config):
     hypothesis_results = []
 
     for name, model_def in models.items():
+
+    # Only Logistic Regression uses scaled data
+        if name == "logistic_regression":
+            X_train_model = X_train_scaled
+            X_test_model = X_test_scaled
+        else:
+            X_train_model = X_train
+            X_test_model = X_test
+
         result = train_model(
             name=name,
             model_def=model_def,
-            X_train=X_train,
-            X_test=X_test,
+            X_train=X_train_model,
+            X_test=X_test_model,
             y_train=y_train,
             y_test=y_test,
             config=config,
@@ -414,6 +596,7 @@ def run_training(df, config):
             reports_dir=reports_dir,
             hypothesis_results=hypothesis_results,
         )
+
         results.append(result)
 
     #  Model Assessment Report 
@@ -429,6 +612,7 @@ def run_training(df, config):
         "test_accuracy",
         "accuracy_overfitting_gap",
         "train_recall_macro",
+        "test_recall_weighted",
         "test_recall_macro",
         "is_overfitting",
     ]]
