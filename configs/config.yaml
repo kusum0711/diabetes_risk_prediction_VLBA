@@ -9,6 +9,7 @@ model:
   random_state: 42
   cv_folds: 5
   use_smote: true
+  random_search_n_iter: 20
 
 mlflow:
   tracking_uri: http://localhost:5000

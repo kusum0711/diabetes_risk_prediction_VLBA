@@ -19,6 +19,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import (
     train_test_split,
     GridSearchCV,
+    RandomizedSearchCV,
     StratifiedKFold,
 )
 
@@ -179,11 +180,11 @@ def get_models(config):
     cfg = config["models"]
     random_state = config["model"]["random_state"]
 
-    if cfg["logistic_regression"]["enabled"]:
-        models["logistic_regression"] = {
-            "model": LogisticRegression(random_state=random_state, class_weight="balanced"),
-            "param_grid": cfg["logistic_regression"]["param_grid"],
-        }
+    # if cfg["logistic_regression"]["enabled"]:
+    #     models["logistic_regression"] = {
+    #         "model": LogisticRegression(random_state=random_state, class_weight="balanced"),
+    #         "param_grid": cfg["logistic_regression"]["param_grid"],
+    #     }
 
     if cfg["random_forest"]["enabled"]:
         models["random_forest"] = {
@@ -191,11 +192,11 @@ def get_models(config):
             "param_grid": cfg["random_forest"]["param_grid"],
         }
 
-    if cfg["decision_tree"]["enabled"]:
-        models["decision_tree"] = {
-            "model": DecisionTreeClassifier(random_state=random_state, class_weight="balanced"),
-            "param_grid": cfg["decision_tree"]["param_grid"],
-        }
+    # if cfg["decision_tree"]["enabled"]:
+    #     models["decision_tree"] = {
+    #         "model": DecisionTreeClassifier(random_state=random_state, class_weight="balanced"),
+    #         "param_grid": cfg["decision_tree"]["param_grid"],
+    #     }
 
     if cfg["xgboost"]["enabled"]:
         models["xgboost"] = {
@@ -359,13 +360,15 @@ def train_model(
         random_state=config["model"]["random_state"],
     )
 
-    grid_search = GridSearchCV(
+    grid_search = RandomizedSearchCV(
         estimator=model_def["model"],
-        param_grid=model_def["param_grid"],
+        param_distributions=model_def["param_grid"],
+        n_iter=config["model"].get("random_search_n_iter", 30),
         cv=cv,
-        scoring="recall_macro",  # primary metric is F1-score
+        scoring="recall_macro",  # primary metric is recall_macro
         n_jobs=-1,
         verbose=1,
+        random_state=config["model"]["random_state"],
     )
 
     with mlflow.start_run(run_name=name):
