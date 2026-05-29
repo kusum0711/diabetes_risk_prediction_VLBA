@@ -8,8 +8,8 @@ O
 /
 __dummy"
 __dummy_idJdiabetes_risk_prediction
-¯ãæÏØ×Î†¯ãæÏØ×Î†1"$c449e88e-dc98-4e70-b3c3-d0b7e3371259*Õ¦ÁĞğ¯¾2…
-å
+¯ãæÏØ×Î†¯ãæÏØ×Î†1"$476651de-dc58-4cd7-a026-93f04be8440a*ªÄàĞØœŒë2Ç
+¦
 diabetes_featuresdiabetes_risk_predictionpatient"
 
 HighBP"
@@ -34,13 +34,10 @@ __dummy_idJdiabetes_risk_prediction
 Age"
 	Education"
 
-Income"
-metabolic_risk"
-health_burden"
-age_metabolic_risk2€†°–:Çevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquet’ä€ÁĞ°¥¨Å"ä€ÁĞ°¥¨Å@b
+Income2€†°–:Çevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquet’÷½àĞÈ˜ÜÖ"÷½àĞÈ˜ÜÖ@b
 
-patient_id
-¯ãæÏà¦•‡å€ÁĞğÇ…ARy
+patient_id
+¯ãæÏà¦•‡÷½àĞˆøúïRy
 w
 ,feast.infra.online_stores.sqlite.SqliteTable"G
 /app/data/online_store.db*diabetes_risk_prediction_diabetes_featuresbâevent_timestampZ/-/app/data/processed/diabetes_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢-/app/data/processed/diabetes_features.parquetªdiabetes_risk_prediction’¯ãæÏÈ×›»"¯ãæÏ€‡°…Š:

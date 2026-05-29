@@ -111,26 +111,26 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     # print("  Interaction features created")
     # df["BMI_scaled"] = scaler.fit_transform(df[["BMI"]])
 
-    df["metabolic_risk"] = (
-        (df["BMI"] >= 30).astype(int) +
-        df["HighBP"] +
-        df["HighChol"]
-    )
+#     df["metabolic_risk"] = (
+#         (df["BMI"] >= 30).astype(int) +
+#         df["HighBP"] +
+#         df["HighChol"]
+#     )
 
-    print("  Metabolic risk feature created")
+#     print("  Metabolic risk feature created")
     
-    df["health_burden"] = (
-        df["GenHlth"] +
-        (df["PhysHlth"] / 10) +
-        (df["MentHlth"] / 10)
-    )
-    print("  Health burden feature created")
+#     df["health_burden"] = (
+#         df["GenHlth"] +
+#         (df["PhysHlth"] / 10) +
+#         (df["MentHlth"] / 10)
+#     )
+#     print("  Health burden feature created")
    
 
-    df["age_metabolic_risk"] = (
-    df["Age"] * df["metabolic_risk"]
-)
-    print("  Age-metabolic risk interaction feature created")
+#     df["age_metabolic_risk"] = (
+#     df["Age"] * df["metabolic_risk"]
+# )
+#     print("  Age-metabolic risk interaction feature created")
 
     return df
 # def build_feature_set(
