@@ -25,6 +25,8 @@ FEATURES = [
     "diabetes_features:Age",
     "diabetes_features:Education",
     "diabetes_features:Income",
+    "diabetes_features:age_metabolic_risk",
+    "diabetes_features:HealthRiskScore",
     # "diabetes_features:metabolic_risk",
     # "diabetes_features:health_burden",
     # "diabetes_features:age_metabolic_risk",

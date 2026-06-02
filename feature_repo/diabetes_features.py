@@ -39,6 +39,8 @@ diabetes_feature_view = FeatureView(
         Field(name="Age", dtype=Float32),
         Field(name="Education", dtype=Float32),
         Field(name="Income", dtype=Float32),
+        Field(name="age_metabolic_risk", dtype=Float32),
+        Field(name="HealthRiskScore", dtype=Float32),
 
         # Only engineered feature kept
         # Field(name="metabolic_risk", dtype=Float32),

@@ -12,7 +12,7 @@ import numpy as np
 from pathlib import Path
 
 from sklearn.linear_model import LogisticRegression
-from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 
@@ -43,6 +43,55 @@ from src.evaluate import (
     evaluate_hypotheses,
 )
 
+# Quick global switch to disable MLflow telemetry/logging when set to False
+# Set to True to re-enable MLflow interactions.
+MLFLOW_ENABLED = False
+
+if not MLFLOW_ENABLED:
+    import contextlib
+
+    class _DummyMLflow:
+        def set_experiment(self, *a, **k):
+            return None
+
+        def set_tracking_uri(self, *a, **k):
+            return None
+
+        def log_params(self, *a, **k):
+            return None
+
+        def log_param(self, *a, **k):
+            return None
+
+        def log_metrics(self, *a, **k):
+            return None
+
+        def log_metric(self, *a, **k):
+            return None
+
+        def log_artifact(self, *a, **k):
+            return None
+
+        def start_run(self, *a, **k):
+            @contextlib.contextmanager
+            def _cm(*args, **kwargs):
+                yield
+
+            return _cm()
+
+        class sklearn:
+            @staticmethod
+            def log_model(*a, **k):
+                return None
+
+        class xgboost:
+            @staticmethod
+            def log_model(*a, **k):
+                return None
+
+    # Override the mlflow module object in this namespace with a no-op stub
+    mlflow = _DummyMLflow()
+
 
 
 # Data Preparation 
@@ -52,7 +101,14 @@ def prepare_data(df, config):
     drop_cols = [c for c in drop_cols if c in df.columns]
 
     X = df.drop(columns=drop_cols)
-    y = df[target]
+    # Preserve original target column but convert to binary for modeling
+    y = df[target].copy()
+
+    # If multiclass (e.g., 0=no,1=prediabetes,2=diabetes) convert to binary:
+    # 0 -> 0 (no diabetes), 1 or 2 -> 1 (has diabetes / at risk)
+    if y.nunique() > 2:
+        print("Converting multiclass target to binary: 0 -> 0, 1/2 -> 1")
+        y = (y >= 1).astype(int)
  
     X = encode_categorical_features(X)
 
@@ -86,22 +142,10 @@ def apply_smote(X_train, y_train, config):
     print("\n  Class distribution BEFORE SMOTE:")
     print(pd.Series(y_train).value_counts())
 
+    # Resample minority class 1 to 50% of the majority class count
     smote = SMOTE(
-        # sampling_strategy = {
-        #     0: int(y_train.value_counts()[0] * 1.0),  # keep majority class as is
-        #     1: int(y_train.value_counts()[0] * 0.5),  # oversample minority class to 50% of majority
-        #     2: int(y_train.value_counts()[0] * 0.5),    
-        # },  # targeted oversampling
-        # sampling_strategy={
-        #     1:8000,
-        #     2:50000
-        # },  # oversample all minority classes to match majority
-                sampling_strategy={
-            1:7000,
-            2:40000
-        },
-        # sampling_strategy="auto",  # oversample all minority classes to match majority
-        random_state=config["model"]["random_state"]
+        sampling_strategy=0.5,
+        random_state=config["model"]["random_state"],
     )
     X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
 
@@ -186,11 +230,18 @@ def get_models(config):
     #         "param_grid": cfg["logistic_regression"]["param_grid"],
     #     }
 
-    if cfg["random_forest"]["enabled"]:
-        models["random_forest"] = {
-            "model": BalancedRandomForestClassifier(random_state=random_state, n_jobs=-1),
-            "param_grid": cfg["random_forest"]["param_grid"],
-        }
+    # if cfg["random_forest"]["enabled"]:
+    #     models["random_forest"] = {
+    #         "model": RandomForestClassifier(
+    #             random_state=random_state,
+    #             class_weight=cfg["random_forest"].get(
+    #                 "class_weight",
+    #                 "balanced_subsample",
+    #             ),
+    #             n_jobs=1,
+    #         ),
+    #         "param_grid": cfg["random_forest"]["param_grid"],
+    #     }
 
     # if cfg["decision_tree"]["enabled"]:
     #     models["decision_tree"] = {
@@ -202,9 +253,8 @@ def get_models(config):
         models["xgboost"] = {
             "model": XGBClassifier(
                 random_state=random_state,
-                eval_metric="mlogloss",
-                objective="multi:softprob",
-                num_class=3,
+                eval_metric="logloss",
+                objective="binary:logistic",
 
                 tree_method="hist",
                 n_jobs=-1,
@@ -312,6 +362,24 @@ def tune_multiclass_thresholds(
     return best_thresholds
 
 
+def tune_binary_threshold(y_true, y_score, threshold_range=np.arange(0.1, 0.9, 0.01)):
+    """
+    Tune a single threshold for binary classification optimizing F1 for the positive class.
+    """
+    best_threshold = 0.5
+    best_f1 = 0.0
+
+    for t in threshold_range:
+        y_pred = (y_score >= t).astype(int)
+        f1 = f1_score(y_true, y_pred, zero_division=0)
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = t
+
+    print(f"  Best binary threshold: {best_threshold:.2f} (F1={best_f1:.4f})")
+    return best_threshold
+
+
 def apply_custom_thresholds(y_probs, thresholds):
     """
     Apply thresholds safely for multiclass classification.
@@ -401,17 +469,35 @@ def train_model(
         # Predict probabilities
         y_probs = best_model.predict_proba(X_test)
 
-        # Tune thresholds automatically
-        best_thresholds = tune_multiclass_thresholds(
-            y_true=y_test,
-            y_probs=y_probs,
-        )
+        # If binary classification, allow using a configured threshold for the
+        # positive class (class 1). If not configured, fall back to tuning.
+        if y_probs.shape[1] == 2:
+            pos_scores = y_probs[:, 1]
+            config_threshold = config.get("model", {}).get("class_1_threshold", None)
+            if config_threshold is not None:
+                try:
+                    best_threshold = float(config_threshold)
+                    print(f"  Using configured class 1 threshold: {best_threshold:.2f}")
+                except Exception:
+                    print("  Invalid class_1_threshold in config; falling back to tuning.")
+                    best_threshold = tune_binary_threshold(y_true=y_test, y_score=pos_scores)
+            else:
+                best_threshold = tune_binary_threshold(y_true=y_test, y_score=pos_scores)
 
-        # Apply thresholds
-        y_pred = apply_custom_thresholds(
-            y_probs,
-            best_thresholds,
-        )
+            y_pred = (pos_scores >= best_threshold).astype(int)
+            best_thresholds = {1: best_threshold}
+        else:
+            # Multiclass fallback (original behavior)
+            best_thresholds = tune_multiclass_thresholds(
+                y_true=y_test,
+                y_probs=y_probs,
+            )
+
+            # Apply thresholds for multiclass
+            y_pred = apply_custom_thresholds(
+                y_probs,
+                best_thresholds,
+            )
 
         # Compute test metrics manually
         test_metrics = {
@@ -444,10 +530,16 @@ def train_model(
         
 
             
+        # Human-readable target names
+        if np.unique(y_test).size == 2:
+            target_names = ['No Diabetes', 'Diabetes']
+        else:
+            target_names = ['No Diabetes', 'Pre-diabetes', 'Diabetes']
+
         report = classification_report(
             y_test,
             y_pred,
-            target_names=['No Diabetes', 'Pre-diabetes', 'Diabetes']
+            target_names=target_names,
         )
         print(f"\nClassification Report — {name}")
         print(report)

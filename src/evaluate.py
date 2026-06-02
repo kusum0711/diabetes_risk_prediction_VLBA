@@ -71,12 +71,12 @@ def compute_metrics(model, X, y, prefix=""):
             zero_division=0
         ),
 
-        #  ROC AUC 
-        f"{prefix}auc_roc": roc_auc_score(
-            y,
-            y_proba,
-            multi_class="ovr",
-            average="weighted"
+        #  ROC AUC
+        # For binary problems pass the positive class scores; for multiclass use multi_class OVR
+        f"{prefix}auc_roc": (
+            roc_auc_score(y, y_proba[:, 1])
+            if (hasattr(y_proba, 'shape') and y_proba.ndim == 2 and y_proba.shape[1] == 2)
+            else roc_auc_score(y, y_proba, multi_class="ovr", average="weighted")
         ),
     }
 
@@ -117,9 +117,16 @@ def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
 # Confusion Matrix
 def save_confusion_matrix(cm, model_name, reports_dir):
     fig, ax = plt.subplots(figsize=(8, 6))
+    # Choose labels based on confusion matrix shape
+    n_labels = cm.shape[0]
+    if n_labels == 2:
+        labels = ["No Diabetes (0)", "Diabetes (1)"]
+    else:
+        labels = ["No Diabetes (0)", "Pre Diabetes (1)", "Diabetes (2)"]
+
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm,
-        display_labels=["No Diabetic (0)", "Pre Diabetes (1)", "Diabetic (2)"],
+        display_labels=labels,
     )
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
     ax.set_title(f"Confusion Matrix — {model_name}")
