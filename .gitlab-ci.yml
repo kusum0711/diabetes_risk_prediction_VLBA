@@ -19,20 +19,20 @@ variables:
 
   # Service endpoints — host networking, reachable on localhost. On the cluster
   # these become the service hostnames (mlflow:5000, garage:3900, feast:6000, ...).
-  MLFLOW_TRACKING_URI: "http://localhost:5050"
-  MLFLOW_S3_ENDPOINT_URL: "http://localhost:3900"
-  FEAST_URL: "http://localhost:6000"
-  PUSHGATEWAY_URL: "http://localhost:9091"
+  MLFLOW_TRACKING_URI: "http://mlflow:5000"
+  # MLFLOW_S3_ENDPOINT_URL: "http://localhost:3900"
+  FEAST_URL: "http://feast:6000"
+  PUSHGATEWAY_URL: "http://pushgateway:9091/pushgateway"
 
   # S3 / Garage object store
-  S3_ENDPOINT: "http://localhost:3900"
-  AWS_ENDPOINT_URL: "http://localhost:3900"
-  AWS_ENDPOINT_URL_S3: "http://localhost:3900"
+  S3_ENDPOINT: "http://garage:3900"
+  AWS_ENDPOINT_URL: "http://garage:3900"
+  AWS_ENDPOINT_URL_S3: "http://garage:3900"
   AWS_REGION: "garage"
   AWS_DEFAULT_REGION: "garage"
-  AWS_ACCESS_KEY_ID: "minioadmin"
-  AWS_SECRET_ACCESS_KEY: "minioadmin"
-  FEAST_SOURCE_PATH: "s3://feast/diabetes_features.parquet"
+  # AWS_ACCESS_KEY_ID: "minioadmin"
+  # AWS_SECRET_ACCESS_KEY: "minioadmin"
+  # FEAST_SOURCE_PATH: "s3://feast/diabetes_features.parquet"
 
   # Feast Postgres online store — disabled for local; the server profile uses a
   # local sqlite online store instead (see feature_store.yaml.server).
