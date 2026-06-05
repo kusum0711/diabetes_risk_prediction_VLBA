@@ -1,3 +1,7 @@
+import sys
+
+import pandas as pd
+
 from src.preprocess import (
     load_data,
     validate_data,
@@ -14,14 +18,18 @@ from src.feast_utils import (
 )
 
 from src.train import run_training
+from src.online_infer import run_online_infer
 from src.config import load_config
 
 
-def run_pipeline():
+# Hand-off file produced by the prepare-data pipeline and consumed by the
+# train pipeline. Must match get_training_data's default output_path.
+TRAINING_DATA_PATH = "data/processed/training_data_from_feast.csv"
 
-    print("\n🚀 DIABETES RISK PREDICTION PIPELINE")
 
-    config = load_config()
+def run_prepare_data():
+
+    print("\n🚀 DIABETES RISK PREDICTION — PREPARE DATA PIPELINE")
 
     # ----------------------------------
     # STEP 1: LOAD DATA
@@ -62,18 +70,52 @@ def run_pipeline():
     # ----------------------------------
     training_df = get_training_data()
 
+    print("\n  PREPARE DATA PIPELINE COMPLETED")
+
+    return training_df
+
+
+def run_train():
+
+    print("\n🚀 DIABETES RISK PREDICTION — TRAIN PIPELINE")
+
+    config = load_config()
+
     # ----------------------------------
-    # STEP 8: TRAIN MODELS
+    # STEP 8: LOAD TRAINING DATA
+    # (produced by the prepare-data pipeline)
+    # ----------------------------------
+    training_df = pd.read_csv(TRAINING_DATA_PATH)
+
+    # ----------------------------------
+    # STEP 9: TRAIN MODELS
     # ----------------------------------
     results = run_training(
         training_df,
         config,
     )
 
-    print("\n  PIPELINE COMPLETED")
+    print("\n  TRAIN PIPELINE COMPLETED")
 
     return results
 
 
+def run_pipeline():
+    """Run the full pipeline (prepare data + train) sequentially."""
+
+    run_prepare_data()
+    return run_train()
+
+
 if __name__ == "__main__":
-    run_pipeline()
+
+    stage = sys.argv[1] if len(sys.argv) > 1 else "all"
+
+    if stage == "prepare":
+        run_prepare_data()
+    elif stage == "train":
+        run_train()
+    elif stage in ("online", "online-infer", "infer"):
+        run_online_infer()
+    else:
+        run_pipeline()

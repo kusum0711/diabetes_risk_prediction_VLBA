@@ -9,7 +9,11 @@ xgboost
 imbalanced-learn
 
 # Feature Store
-feast
+feast[postgres,aws]
+
+# Object store (S3 / Garage / MinIO) access
+boto3
+s3fs
 
 # Config
 pyyaml

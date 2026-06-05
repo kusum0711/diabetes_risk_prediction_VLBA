@@ -1,0 +1,36 @@
+build-images:
+  stage: build-images
+  # image: docker:27
+  # services:
+  #   - docker:27-dind
+  # variables:
+  #   DOCKER_TLS_CERTDIR: "/certs"
+  # before_script:
+  #   - echo "Logging in to Docker registry..."
+  #   - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - echo "Building app image ${IMAGE}..."
+    - docker buildx build -t ${IMAGE} .
+    - |
+      if [ -n "$CI_REGISTRY_PASSWORD" ]; then
+        echo "Pushing ${IMAGE}..."
+        docker push ${IMAGE}
+      else
+        echo "No registry credentials — skipping push (local build)."
+      fi
+
+build-feast:
+  stage: build-images
+  # image: docker:27
+  # services:
+  #   - docker:27-dind
+  script:
+    - echo "Building feast image ${FEAST_IMAGE}..."
+    - docker buildx build -f Dockerfile.feast -t ${FEAST_IMAGE} .
+    - |
+      if [ -n "$CI_REGISTRY_PASSWORD" ]; then
+        echo "Pushing ${FEAST_IMAGE}..."
+        docker push ${FEAST_IMAGE}
+      else
+        echo "No registry credentials — skipping push (local build)."
+      fi

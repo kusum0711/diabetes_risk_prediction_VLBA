@@ -1,3 +1,4 @@
+import os
 import time
 import mlflow
 import mlflow.sklearn
@@ -46,9 +47,15 @@ from src.evaluate import (
     evaluate_hypotheses,
 )
 
-# Quick global switch to disable MLflow telemetry/logging when set to False
-# Set to True to re-enable MLflow interactions.
-MLFLOW_ENABLED = False
+from src.metrics import push_metrics
+
+# MLflow is enabled automatically when a tracking server is configured via the
+# MLFLOW_TRACKING_URI env var (e.g. http://mlflow:5000 on the cluster). With no
+# server configured (local dev / tests) it falls back to a no-op stub so the
+# pipeline still runs offline. Set MLFLOW_FORCE_ENABLED=1 to override.
+MLFLOW_ENABLED = bool(os.environ.get("MLFLOW_TRACKING_URI")) or bool(
+    os.environ.get("MLFLOW_FORCE_ENABLED")
+)
 
 if not MLFLOW_ENABLED:
     import contextlib
@@ -751,6 +758,23 @@ def run_training(df, config):
         hypothesis_path = reports_dir / "hypothesis_report.csv"
         hypothesis_df.to_csv(hypothesis_path, index=False)
         print(f"📄 Hypothesis report saved: {hypothesis_path}")
+
+    # ── Push best-model metrics to Pushgateway (→ Grafana) ──
+    if results:
+        best = max(
+            results,
+            key=lambda r: r["test_metrics"]["test_recall_macro"],
+        )
+        push_metrics(
+            job="diabetes_train",
+            metrics={
+                "diabetes_best_test_recall_macro": best["test_metrics"]["test_recall_macro"],
+                "diabetes_best_test_f1_macro": best["test_metrics"]["test_f1_macro"],
+                "diabetes_best_test_accuracy": best["test_metrics"]["test_accuracy"],
+                "diabetes_best_test_auc_roc": best["test_metrics"]["test_auc_roc"],
+            },
+            grouping={"model": best["model_name"]},
+        )
 
     print("\n  All models trained, evaluated, and logged to MLflow.")
     return results

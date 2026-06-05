@@ -1,0 +1,20 @@
+# Local overrides for `gitlab-ci-local`. These are the values that differ
+# between local and the university cluster: secrets + local image tags. The
+# service hostnames/URLs themselves live in .gitlab-ci.yml and are identical
+# both places (resolved via the docker-compose `mlops-net` network locally).
+#
+# Run the local pipeline with:
+#   docker compose up -d
+#   gitlab-ci-local --network mlops-net
+#
+---
+# Local image tags (no registry prefix needed locally)
+IMAGE: team4-diabetes-app:local
+FEAST_IMAGE: team4-feast:local
+
+# MinIO credentials (stand-in for Garage); on the cluster these are masked CI vars
+AWS_ACCESS_KEY_ID: minioadmin
+AWS_SECRET_ACCESS_KEY: minioadmin
+
+# Feast Postgres online store password
+POSTGRES_FEAST_PASSWORD: feast

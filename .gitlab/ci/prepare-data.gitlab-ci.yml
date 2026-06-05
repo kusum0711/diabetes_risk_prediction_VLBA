@@ -1,0 +1,14 @@
+prepare-data:
+  stage: prepare-data
+  image: ${IMAGE}
+  needs:
+    - build-images
+  script:
+    - echo "Running prepare-data pipeline..."
+    # Writes feature parquet + registry to S3/Garage; produces the training CSV.
+    - python -m src.main prepare
+    - echo "Prepare-data pipeline completed."
+  artifacts:
+    paths:
+      - data/processed/training_data_from_feast.csv
+    expire_in: 1 day

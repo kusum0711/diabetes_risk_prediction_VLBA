@@ -1,3 +1,5 @@
+import os
+
 from datetime import timedelta
 
 from feast import Entity, FeatureView, Field, FileSource
@@ -10,9 +12,18 @@ patient = Entity(
     description="Unique patient row identifier",
 )
 
+# Feature data location is environment-aware: local parquet by default, or an
+# S3/Garage object when FEAST_SOURCE_PATH is set (s3://feast/...). The custom
+# S3 endpoint (MinIO locally, Garage on the cluster) comes from AWS_ENDPOINT_URL.
+FEAST_SOURCE_PATH = os.environ.get(
+    "FEAST_SOURCE_PATH",
+    "/app/data/processed/diabetes_features.parquet",
+)
+
 diabetes_source = FileSource(
-    path="/app/data/processed/diabetes_features.parquet",
+    path=FEAST_SOURCE_PATH,
     timestamp_field="event_timestamp",
+    s3_endpoint_override=os.environ.get("AWS_ENDPOINT_URL"),
 )
 
 diabetes_feature_view = FeatureView(

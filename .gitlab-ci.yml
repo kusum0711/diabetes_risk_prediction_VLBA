@@ -1,0 +1,46 @@
+stages:
+  - build-images
+  - prepare-data
+  - train
+  - online-infer
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  BUILDKIT_PROGRESS: "plain"
+
+  # ---------------------------------------------------------------------------
+  # LOCAL configuration (docker-compose `mlops-net`). For the cluster, swap the
+  # image tags for the registry paths and move the credentials to masked CI vars.
+  # ---------------------------------------------------------------------------
+
+  # Images (local tags; on the cluster: ${CI_REGISTRY_IMAGE}/...:${CI_COMMIT_SHORT_SHA})
+  IMAGE: "team4-diabetes-app:local"
+  FEAST_IMAGE: "team4-feast:local"
+
+  # Service endpoints — host networking, reachable on localhost. On the cluster
+  # these become the service hostnames (mlflow:5000, garage:3900, feast:6000, ...).
+  MLFLOW_TRACKING_URI: "http://localhost:5050"
+  MLFLOW_S3_ENDPOINT_URL: "http://localhost:3900"
+  FEAST_URL: "http://localhost:6000"
+  PUSHGATEWAY_URL: "http://localhost:9091"
+
+  # S3 / Garage object store
+  S3_ENDPOINT: "http://localhost:3900"
+  AWS_ENDPOINT_URL: "http://localhost:3900"
+  AWS_ENDPOINT_URL_S3: "http://localhost:3900"
+  AWS_REGION: "garage"
+  AWS_DEFAULT_REGION: "garage"
+  AWS_ACCESS_KEY_ID: "minioadmin"
+  AWS_SECRET_ACCESS_KEY: "minioadmin"
+  FEAST_SOURCE_PATH: "s3://feast/diabetes_features.parquet"
+
+  # Feast Postgres online store — disabled for local; the server profile uses a
+  # local sqlite online store instead (see feature_store.yaml.server).
+  # POSTGRES_FEAST_HOST: "postgres"
+  # POSTGRES_FEAST_PORT: "5432"
+  # POSTGRES_FEAST_DB: "feast"
+  # POSTGRES_FEAST_USER: "feast"
+  # POSTGRES_FEAST_PASSWORD: "feast"
+
+include:
+  - local: .gitlab/ci/*.gitlab-ci.yml
