@@ -6,6 +6,9 @@ from sklearn.utils.class_weight import compute_sample_weight
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
+from sklearn.metrics import roc_auc_score
+
+
 import numpy as np
 
 
@@ -230,18 +233,18 @@ def get_models(config):
     #         "param_grid": cfg["logistic_regression"]["param_grid"],
     #     }
 
-    # if cfg["random_forest"]["enabled"]:
-    #     models["random_forest"] = {
-    #         "model": RandomForestClassifier(
-    #             random_state=random_state,
-    #             class_weight=cfg["random_forest"].get(
-    #                 "class_weight",
-    #                 "balanced_subsample",
-    #             ),
-    #             n_jobs=1,
-    #         ),
-    #         "param_grid": cfg["random_forest"]["param_grid"],
-    #     }
+    if cfg["random_forest"]["enabled"]:
+        models["random_forest"] = {
+            "model": RandomForestClassifier(
+                random_state=random_state,
+                class_weight=cfg["random_forest"].get(
+                    "class_weight",
+                    "balanced_subsample",
+                ),
+                n_jobs=1,
+            ),
+            "param_grid": cfg["random_forest"]["param_grid"],
+        }
 
     # if cfg["decision_tree"]["enabled"]:
     #     models["decision_tree"] = {
@@ -249,21 +252,21 @@ def get_models(config):
     #         "param_grid": cfg["decision_tree"]["param_grid"],
     #     }
 
-    if cfg["xgboost"]["enabled"]:
-        models["xgboost"] = {
-            "model": XGBClassifier(
-                random_state=random_state,
-                eval_metric="logloss",
-                objective="binary:logistic",
+    # if cfg["xgboost"]["enabled"]:
+    #     models["xgboost"] = {
+    #         "model": XGBClassifier(
+    #             random_state=random_state,
+    #             eval_metric="logloss",
+    #             objective="binary:logistic",
 
-                tree_method="hist",
-                n_jobs=-1,
+    #             tree_method="hist",
+    #             n_jobs=-1,
 
-                reg_alpha=0.1,
-                reg_lambda=1.0,
-            ),
-            "param_grid": cfg["xgboost"]["param_grid"],
-        }
+    #             reg_alpha=0.1,
+    #             reg_lambda=1.0,
+    #         ),
+    #         "param_grid": cfg["xgboost"]["param_grid"],
+    #     }
 
     return models
 
@@ -477,7 +480,7 @@ def train_model(
             if config_threshold is not None:
                 try:
                     best_threshold = float(config_threshold)
-                    print(f"  Using configured class 1 threshold: {best_threshold:.2f}")
+                    # print(f"  Using configured class 1 threshold: {best_threshold:.2f}")
                 except Exception:
                     print("  Invalid class_1_threshold in config; falling back to tuning.")
                     best_threshold = tune_binary_threshold(y_true=y_test, y_score=pos_scores)
@@ -498,36 +501,63 @@ def train_model(
                 y_probs,
                 best_thresholds,
             )
+        
+        
+        # Test ROC AUC  
+        if y_probs.shape[1] == 2:
 
+            test_auc_roc = roc_auc_score(
+                y_test,
+                y_probs[:, 1],
+            )
+
+        else:
+
+            test_auc_roc = roc_auc_score(
+                y_test,
+                y_probs,
+                multi_class="ovr",
+                average="weighted",
+            )
         # Compute test metrics manually
+
         test_metrics = {
-            "test_accuracy": accuracy_score(y_test, y_pred),
+
+            "test_accuracy": accuracy_score(
+                y_test,
+                y_pred,
+            ),
+
             "test_precision_macro": precision_score(
                 y_test,
                 y_pred,
                 average="macro",
                 zero_division=0,
             ),
+
             "test_recall_macro": recall_score(
                 y_test,
                 y_pred,
                 average="macro",
                 zero_division=0,
             ),
+
             "test_recall_weighted": recall_score(
                 y_test,
                 y_pred,
                 average="weighted",
                 zero_division=0,
             ),
+
             "test_f1_macro": f1_score(
                 y_test,
                 y_pred,
                 average="macro",
                 zero_division=0,
             ),
-        }
-        
+
+            "test_auc_roc": test_auc_roc,
+        }   
 
             
         # Human-readable target names

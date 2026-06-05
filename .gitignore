@@ -19,6 +19,9 @@ data/processed/
 # Reports (generated automatically)
 reports/
 
+# Scripts
+scripts/
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
