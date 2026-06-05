@@ -1,6 +1,6 @@
 online-infer:
   stage: online-infer
-  image: ${IMAGE}
+  image: ${CI_IMAGE}
   needs:
     - build-images
     - train

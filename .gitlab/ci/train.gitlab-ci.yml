@@ -1,6 +1,6 @@
 train:
   stage: train
-  image: ${IMAGE}
+  image: ${CI_IMAGE}
   needs:
     - build-images
     - prepare-data

@@ -1,6 +1,6 @@
 prepare-data:
   stage: prepare-data
-  image: ${IMAGE}
+  image: ${CI_IMAGE}
   needs:
     - build-images
   script:

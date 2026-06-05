@@ -9,12 +9,12 @@ build-images:
     - echo "Logging in to Docker registry..."
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
-    - echo "Building app image ${IMAGE}..."
-    - docker buildx build -t ${CI_REGISTRY_IMAGE}/${IMAGE}:${CI_COMMIT_SHORT_SHA} .
+    - echo "Building app image ${CI_IMAGE}..."
+    - docker buildx build -t ${CI_IMAGE} .
     - |
       if [ -n "$CI_REGISTRY_PASSWORD" ]; then
-        echo "Pushing ${IMAGE}..."
-        docker push ${CI_REGISTRY_IMAGE}/${IMAGE}:${CI_COMMIT_SHORT_SHA}
+        echo "Pushing ${CI_IMAGE}..."
+        docker push ${CI_IMAGE}
         echo "No registry credentials — skipping push (local build)."
       fi
 
