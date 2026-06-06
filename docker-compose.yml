@@ -35,7 +35,6 @@ services:
       until mc alias set local http://localhost:3900 minioadmin minioadmin; do echo 'waiting for garage'; sleep 2; done;
       mc mb -p local/mlflow;
       mc mb -p local/feast;
-      mc mb -p local/mlflow-artifacts;
       echo 'buckets ready';
       exit 0;
       "
