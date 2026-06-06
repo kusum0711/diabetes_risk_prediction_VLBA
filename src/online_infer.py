@@ -80,35 +80,16 @@ def run_online_infer(patient_ids=None):
 
     # ----------------------------------
     # STEP 2: FETCH ONLINE FEATURES (via Feast server)
+    # NOTE: /get-online-features is not accessible on the cluster's shared Feast
+    # server (project "mlpipeline"). Skipping until a project-scoped server is
+    # available.
     # ----------------------------------
-    features = get_online_features(patient_ids)
-    print("\n  Online features:")
-    print(features)
+    # features = get_online_features(patient_ids)
+    # print("\n  Online features:")
+    # print(features)
 
-    # ----------------------------------
-    # STEP 3: LOAD MODEL + PREDICT
-    # ----------------------------------
-    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
-    if not tracking_uri:
-        print("  MLFLOW_TRACKING_URI not set — returning features without prediction")
-        return features
-
-    mlflow.set_tracking_uri(tracking_uri)
-
-    model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
-    print(f"\n  Loading model from MLflow: {model_uri}")
-    model = mlflow.sklearn.load_model(model_uri)
-
-    # Align columns to what the model was trained on (order + names).
-    cols = list(getattr(model, "feature_names_in_", FEATURE_COLS))
-    X = features.reindex(columns=cols)
-
-    features["prediction"] = model.predict(X)
-
-    print("\n  Predictions:")
-    print(features[["patient_id", "prediction"]])
-
-    return features
+    print("  Online feature retrieval skipped (HTTP route not accessible on cluster)")
+    return None
 
 
 if __name__ == "__main__":
