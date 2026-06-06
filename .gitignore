@@ -13,8 +13,7 @@ mlruns/
 mlartifacts/
 
 # Data (raw data should not be committed)
-data/raw/
-data/processed/
+data/
 
 # Reports (generated automatically)
 reports/
