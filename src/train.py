@@ -430,7 +430,13 @@ def train_model(
     print(f"  Training: {name}")
     print(f"{'='*60}")
 
-    mlflow.set_experiment(config["mlflow"]["experiment_name"])
+    exp_name = config["mlflow"]["experiment_name"]
+    artifact_location = config["mlflow"].get("artifact_location", "s3://mlflow-artifacts")
+    if MLFLOW_ENABLED:
+        _ensure_s3_bucket(artifact_location)
+        if mlflow.get_experiment_by_name(exp_name) is None:
+            mlflow.create_experiment(exp_name, artifact_location=artifact_location)
+    mlflow.set_experiment(exp_name)
 
     cv = StratifiedKFold(
         n_splits=config["model"]["cv_folds"],
@@ -678,6 +684,30 @@ def train_model(
             "confusion_matrix": cm,
             "model_report": model_report,
         }
+
+
+def _ensure_s3_bucket(artifact_location: str) -> None:
+    """Create the S3 bucket for artifact storage if it doesn't already exist."""
+    try:
+        import boto3
+        from botocore.exceptions import ClientError
+
+        bucket = artifact_location.replace("s3://", "").split("/")[0]
+        endpoint = os.environ.get("MLFLOW_S3_ENDPOINT_URL") or os.environ.get("AWS_ENDPOINT_URL")
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "garage"),
+        )
+        try:
+            s3.head_bucket(Bucket=bucket)
+        except ClientError:
+            s3.create_bucket(Bucket=bucket)
+            print(f"  Created S3 bucket: {bucket}")
+    except Exception as e:
+        print(f"  Warning: could not ensure S3 bucket exists: {e}")
 
 
 #  Main Entry Point

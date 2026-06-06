@@ -15,6 +15,7 @@ model:
 mlflow:
   tracking_uri: http://localhost:5000
   experiment_name: diabetes_risk_prediction
+  artifact_location: s3://mlflow-artifacts
 
 models:
   logistic_regression:
