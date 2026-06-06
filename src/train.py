@@ -430,12 +430,7 @@ def train_model(
     print(f"  Training: {name}")
     print(f"{'='*60}")
 
-    exp_name = config["mlflow"]["experiment_name"]
-    artifact_location = config["mlflow"].get("artifact_location", "s3://mlflow-artifacts")
-    if MLFLOW_ENABLED:
-        if mlflow.get_experiment_by_name(exp_name) is None:
-            mlflow.create_experiment(exp_name, artifact_location=artifact_location)
-    mlflow.set_experiment(exp_name)
+    mlflow.set_experiment(config["mlflow"]["experiment_name"])
 
     cv = StratifiedKFold(
         n_splits=config["model"]["cv_folds"],
