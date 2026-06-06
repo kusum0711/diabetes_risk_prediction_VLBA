@@ -16,7 +16,7 @@ variables:
   # Images (local tags; on the cluster: ${CI_REGISTRY_IMAGE}/...:${CI_COMMIT_SHORT_SHA})
   IMAGE: "diabetes-prediction-app"
   CI_IMAGE: ${CI_REGISTRY_IMAGE}/${IMAGE}:${CI_COMMIT_SHORT_SHA}
-  FEAST_IMAGE: ${CI_REGISTRY_IMAGE}/${FEAST_IMAGE}:${CI_COMMIT_SHORT_SHA}
+  # FEAST_IMAGE: ${CI_REGISTRY_IMAGE}/${FEAST_IMAGE}:${CI_COMMIT_SHORT_SHA}
 
   # Service endpoints — host networking, reachable on localhost. On the cluster
   # these become the service hostnames (mlflow:5000, garage:3900, feast:6000, ...).

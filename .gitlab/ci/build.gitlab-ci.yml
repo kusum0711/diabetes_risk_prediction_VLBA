@@ -18,18 +18,3 @@ build-images:
         echo "No registry credentials — skipping push (local build)."
       fi
 
-# build-feast:
-#   stage: build-images
-#   # image: docker:27
-#   # services:
-#   #   - docker:27-dind
-#   script:
-#     - echo "Building feast image ${FEAST_IMAGE}..."
-#     - docker buildx build -f Dockerfile.feast -t ${FEAST_IMAGE} .
-#     - |
-#       if [ -n "$CI_REGISTRY_PASSWORD" ]; then
-#         echo "Pushing ${FEAST_IMAGE}..."
-#         docker push ${FEAST_IMAGE}
-#       else
-#         echo "No registry credentials — skipping push (local build)."
-#       fi

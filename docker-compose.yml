@@ -25,11 +25,21 @@ services:
     volumes:
       - garage-data:/data
     network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3900/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   # One-shot: wait for the object store, then create the buckets and seed the raw dataset.
   createbuckets:
     image: minio/mc:latest
     network_mode: host
+    depends_on:
+      garage:
+        condition: service_healthy
     volumes:
       - ./data/raw:/data/raw:ro
     entrypoint: >
@@ -64,7 +74,11 @@ services:
   # registry); artifacts stored on the object store (s3://mlflow).
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.22.0
-    depends_on: [createbuckets]
+    depends_on:
+      garage:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
     environment:
       MLFLOW_S3_ENDPOINT_URL: http://localhost:3900
       AWS_ACCESS_KEY_ID: minioadmin
@@ -134,7 +148,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${IMAGE:-team4-diabetes-app:local}
+    # image: ${IMAGE:-team4-diabetes-app:local}
     # Wait for the infra the prepare+train pipeline actually uses: buckets
     # created (garage ready) and MLflow serving. The Feast SERVER is NOT a
     # dependency — prepare uses a local `feast apply` + offline S3 reads, and
