@@ -26,6 +26,7 @@ variables:
   PUSHGATEWAY_URL: "http://pushgateway:9091/pushgateway"
 
   # S3 / Garage object store
+  RAW_DATA_PATH: "s3://datasets/diabetes.csv"
   S3_ENDPOINT: "http://garage:3900"
   AWS_ENDPOINT_URL: "http://garage:3900"
   AWS_ENDPOINT_URL_S3: "http://garage:3900"

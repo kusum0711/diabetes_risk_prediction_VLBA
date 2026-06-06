@@ -26,15 +26,19 @@ services:
       - garage-data:/data
     network_mode: host
 
-  # One-shot: wait for the object store, then create the buckets.
+  # One-shot: wait for the object store, then create the buckets and seed the raw dataset.
   createbuckets:
     image: minio/mc:latest
     network_mode: host
+    volumes:
+      - ./data/raw:/data/raw:ro
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://localhost:3900 minioadmin minioadmin; do echo 'waiting for garage'; sleep 2; done;
       mc mb -p local/mlflow;
       mc mb -p local/feast;
+      mc mb -p local/datasets;
+      mc cp /data/raw/diabetes.csv local/datasets/diabetes.csv;
       echo 'buckets ready';
       exit 0;
       "
@@ -148,6 +152,7 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://localhost:3900
       FEAST_URL: http://localhost:6000
       PUSHGATEWAY_URL: http://localhost:9091
+      RAW_DATA_PATH: s3://datasets/diabetes.csv
       S3_ENDPOINT: http://localhost:3900
       AWS_ENDPOINT_URL: http://localhost:3900
       AWS_ENDPOINT_URL_S3: http://localhost:3900
