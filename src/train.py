@@ -240,18 +240,18 @@ def get_models(config):
     #         "param_grid": cfg["logistic_regression"]["param_grid"],
     #     }
 
-    if cfg["random_forest"]["enabled"]:
-        models["random_forest"] = {
-            "model": RandomForestClassifier(
-                random_state=random_state,
-                class_weight=cfg["random_forest"].get(
-                    "class_weight",
-                    "balanced_subsample",
-                ),
-                n_jobs=1,
-            ),
-            "param_grid": cfg["random_forest"]["param_grid"],
-        }
+    # if cfg["random_forest"]["enabled"]:
+    #     models["random_forest"] = {
+    #         "model": RandomForestClassifier(
+    #             random_state=random_state,
+    #             class_weight=cfg["random_forest"].get(
+    #                 "class_weight",
+    #                 "balanced_subsample",
+    #             ),
+    #             n_jobs=1,
+    #         ),
+    #         "param_grid": cfg["random_forest"]["param_grid"],
+    #     }
 
     # if cfg["decision_tree"]["enabled"]:
     #     models["decision_tree"] = {
@@ -259,21 +259,21 @@ def get_models(config):
     #         "param_grid": cfg["decision_tree"]["param_grid"],
     #     }
 
-    # if cfg["xgboost"]["enabled"]:
-    #     models["xgboost"] = {
-    #         "model": XGBClassifier(
-    #             random_state=random_state,
-    #             eval_metric="logloss",
-    #             objective="binary:logistic",
+    if cfg["xgboost"]["enabled"]:
+        models["xgboost"] = {
+            "model": XGBClassifier(
+                random_state=random_state,
+                eval_metric="logloss",
+                objective="binary:logistic",
 
-    #             tree_method="hist",
-    #             n_jobs=-1,
+                tree_method="hist",
+                n_jobs=-1,
 
-    #             reg_alpha=0.1,
-    #             reg_lambda=1.0,
-    #         ),
-    #         "param_grid": cfg["xgboost"]["param_grid"],
-    #     }
+                reg_alpha=0.1,
+                reg_lambda=1.0,
+            ),
+            "param_grid": cfg["xgboost"]["param_grid"],
+        }
 
     return models
 
