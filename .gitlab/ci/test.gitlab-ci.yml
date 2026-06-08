@@ -1,9 +1,14 @@
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-lint:
+.test_base:
   stage: test
   image: python:3.10-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends make
+
+lint:
+  extends: .test_base
   cache:
     key:
       prefix: lint-pip
@@ -11,16 +16,14 @@ lint:
         - requirements.txt
     paths:
       - .cache/pip
-  before_script:
-    - pip install flake8
   script:
+    - pip install flake8
     - echo "Running flake8 lint checks..."
-    - python -m flake8 src --max-line-length=120
+    - make lint
     - echo "Lint checks passed."
 
 test:
-  stage: test
-  image: python:3.10-slim
+  extends: .test_base
   cache:
     key:
       prefix: test-pip
@@ -28,9 +31,8 @@ test:
         - requirements.txt
     paths:
       - .cache/pip
-  before_script:
-    - pip install -r requirements.txt
   script:
+    - pip install -r requirements.txt
     - echo "Running test suite in parallel (race mode)..."
-    - python -m pytest src/tests -n auto
+    - make test
     - echo "Tests completed."

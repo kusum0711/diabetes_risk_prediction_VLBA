@@ -8,5 +8,5 @@ online-infer:
     - echo "Running online inference pipeline..."
     # Materializes features into the Postgres online store, then fetches online
     # features and predicts using the model from the MLflow registry.
-    - python -m src.main online-infer
+    - make online-infer
     - echo "Online inference completed."

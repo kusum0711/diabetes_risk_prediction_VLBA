@@ -6,7 +6,7 @@ prepare-data:
   script:
     - echo "Running prepare-data pipeline..."
     # Writes feature parquet + registry to S3/Garage; produces the training CSV.
-    - python -m src.main prepare
+    - make prepare
     - echo "Prepare-data pipeline completed."
   artifacts:
     paths:

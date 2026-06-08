@@ -2,9 +2,11 @@
 # (no custom network) so everything is reachable on localhost; the pipeline jobs
 # run with `gitlab-ci-local --network host` and reach the same localhost ports.
 #
-#   docker compose up -d                            # bring up the infra (used by gitlab-ci-local)
-#   docker compose build feast                      # build the feast server image
-#   docker compose --profile app up diabetes-app    # run the app pipeline locally
+#   make up           # docker compose up -d                          (bring up the infra, used by gitlab-ci-local)
+#   make build-feast  # docker compose build feast                    (build the feast server image)
+#   make app          # docker compose --profile app up diabetes-app  (run the app pipeline locally)
+#
+# See the Makefile for these and the `lint`/`test` targets used by the CI pipeline.
 #
 # The diabetes-app service is behind the `app` profile, so a plain `up -d`
 # brings up ONLY the infra (what gitlab-ci-local connects to on localhost) and

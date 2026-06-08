@@ -8,7 +8,7 @@ train:
     - echo "Running train pipeline..."
     # Reads the training CSV; logs to MLflow (mlflow:5000) with artifacts on S3;
     # pushes best-model metrics to the Pushgateway.
-    - python -m src.main train
+    - make train
     - echo "Train pipeline completed."
   artifacts:
     paths:

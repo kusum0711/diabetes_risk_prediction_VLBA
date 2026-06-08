@@ -37,5 +37,3 @@ Thumbs.db
 feature_repo/data/
 online_store.db
 registry.db
-
-Dockerfile.feast
