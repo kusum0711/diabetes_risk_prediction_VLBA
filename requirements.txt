@@ -1,0 +1,33 @@
+# Data + ML
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+pyarrow
+xgboost
+imbalanced-learn
+
+# Feature Store
+feast[postgres,aws]
+
+# Object store (S3 / Garage / MinIO) access
+boto3
+s3fs
+
+# Config
+pyyaml
+
+# MLflow
+mlflow==2.22.0
+
+# Pipeline
+joblib
+
+# Testing
+pytest
+pytest-cov
+pytest-xdist
+
+# Linting
+flake8

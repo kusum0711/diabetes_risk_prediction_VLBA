@@ -1,0 +1,184 @@
+# Local stand-ins for the university cluster services. Uses host networking
+# (no custom network) so everything is reachable on localhost; the pipeline jobs
+# run with `gitlab-ci-local --network host` and reach the same localhost ports.
+#
+#   make up           # docker compose up -d                          (bring up the infra, used by gitlab-ci-local)
+#   make build-feast  # docker compose build feast                    (build the feast server image)
+#   make app          # docker compose --profile app up diabetes-app  (run the app pipeline locally)
+#
+# See the Makefile for these and the `lint`/`test` targets used by the CI pipeline.
+#
+# The diabetes-app service is behind the `app` profile, so a plain `up -d`
+# brings up ONLY the infra (what gitlab-ci-local connects to on localhost) and
+# does not kick off the pipeline. Run the app explicitly with the command above.
+#
+# NOTE: on the cluster, services are reached by hostname (mlflow:5000, etc.);
+# locally they are on localhost. Only the URLs in .gitlab-ci.yml differ.
+services:
+
+  # S3-compatible object store (stands in for Garage). Feast registry + offline
+  # parquet live in the `feast` bucket; MLflow artifacts in the `mlflow` bucket.
+  garage:
+    image: minio/minio:latest
+    command: server /data --address ":3900" --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - garage-data:/data
+    network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3900/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  # One-shot: wait for the object store, then create the buckets and seed the raw dataset.
+  createbuckets:
+    image: minio/mc:latest
+    network_mode: host
+    depends_on:
+      garage:
+        condition: service_healthy
+    volumes:
+      - ./data/raw:/data/raw:ro
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://localhost:3900 minioadmin minioadmin; do echo 'waiting for garage'; sleep 2; done;
+      mc mb -p local/mlflow;
+      mc mb -p local/feast;
+      mc mb -p local/datasets;
+      mc cp /data/raw/diabetes.csv local/datasets/diabetes.csv;
+      echo 'buckets ready';
+      exit 0;
+      "
+
+  # Postgres-backed Feast online store (only used if the postgres profile is
+  # re-enabled in feature_store.yaml.server; local default is sqlite).
+  # postgres:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_USER: feast
+  #     POSTGRES_PASSWORD: feast
+  #     POSTGRES_DB: feast
+  #   volumes:
+  #     - pg-data:/var/lib/postgresql/data
+  #   network_mode: host
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U feast"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 10
+
+  # MLflow tracking server (port 5050 — host 5000 is taken by the local docker
+  # registry); artifacts stored on the object store (s3://mlflow).
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    depends_on:
+      garage:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://localhost:3900
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: garage
+      AWS_DEFAULT_REGION: garage
+    command: >
+      /bin/sh -c "pip install --no-cache-dir boto3 >/dev/null 2>&1 &&
+      mlflow server --host 0.0.0.0 --port 5050
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root s3://mlflow"
+    volumes:
+      - mlflow-data:/mlflow
+    network_mode: host
+    healthcheck:
+      # python is always present in the mlflow image; /health is served once up.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5050/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  # Feast online feature server (built from Dockerfile.feast).
+  feast:
+    build:
+      context: .
+      dockerfile: Dockerfile.feast
+    image: ${FEAST_IMAGE:-team4-feast:local}
+    # Wait until the buckets exist (garage reachable). `feast apply` still needs
+    # the offline parquet, which the prepare stage produces; until then this
+    # container exits and is restarted by `restart: unless-stopped`.
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+    environment:
+      AWS_ENDPOINT_URL: http://localhost:3900
+      AWS_ENDPOINT_URL_S3: http://localhost:3900
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: garage
+      AWS_DEFAULT_REGION: garage
+      FEAST_SOURCE_PATH: s3://feast/diabetes_features.parquet
+    # Apply (creates the sqlite online tables + S3 registry) then serve, so the
+    # online store the server reads is the same one it materializes into.
+    command: >
+      /bin/sh -c "mkdir -p /app/data &&
+      feast -c feature_repo apply &&
+      feast -c feature_repo serve -h 0.0.0.0 -p 6000"
+    restart: unless-stopped
+    network_mode: host
+    healthcheck:
+      # TCP-connect check: succeeds once `feast serve` is accepting on :6000.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 6000), timeout=3).close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    network_mode: host
+  
+  diabetes-app:
+    # Behind the `app` profile so a plain `docker compose up -d` brings up only
+    # the infra (what gitlab-ci-local uses) without running the pipeline.
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # image: ${IMAGE:-team4-diabetes-app:local}
+    # Wait for the infra the prepare+train pipeline actually uses: buckets
+    # created (garage ready) and MLflow serving. The Feast SERVER is NOT a
+    # dependency — prepare uses a local `feast apply` + offline S3 reads, and
+    # it is prepare that produces the parquet the feast server needs to start.
+    # Depending on feast here would deadlock (feast healthy ⇐ parquet ⇐ prepare).
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      pushgateway:
+        condition: service_started
+    environment:
+      MLFLOW_TRACKING_URI: http://localhost:5050
+      MLFLOW_S3_ENDPOINT_URL: http://localhost:3900
+      FEAST_URL: http://localhost:6000
+      PUSHGATEWAY_URL: http://localhost:9091
+      RAW_DATA_PATH: s3://datasets/diabetes.csv
+      S3_ENDPOINT: http://localhost:3900
+      AWS_ENDPOINT_URL: http://localhost:3900
+      AWS_ENDPOINT_URL_S3: http://localhost:3900
+      AWS_REGION: garage
+      AWS_DEFAULT_REGION: garage
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    network_mode: host
+
+volumes:
+  garage-data:
+  pg-data:
+  mlflow-data:

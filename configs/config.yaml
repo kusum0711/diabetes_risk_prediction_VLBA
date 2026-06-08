@@ -1,0 +1,57 @@
+data:
+  raw_path: data/raw/diabetes.csv
+  processed_path: data/processed/diabetes_processed.csv
+  training_data_path: data/processed/training_data_from_feast.csv
+
+model:
+  target_column: Diabetes_012
+  test_size: 0.2
+  random_state: 42
+  cv_folds: 5
+  use_smote: true
+  random_search_n_iter: 20
+  class_1_threshold: 0.40
+
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: diabetes_risk_prediction
+
+models:
+  logistic_regression:
+    enabled: true
+    param_grid:
+      C: [0.01, 0.1, 1]
+      max_iter: [500]
+      solver: [lbfgs]
+
+  decision_tree:
+    enabled: true
+    param_grid:
+      max_depth: [3, 5]
+      min_samples_split: [2, 5]
+
+  xgboost:
+    enabled: true
+    param_grid:
+      n_estimators: [100]
+      max_depth: [4, 6]
+      learning_rate: [0.05, 0.1]
+      subsample: [0.8]
+      colsample_bytree: [0.8]
+
+  decision_tree:
+    enabled: true
+    param_grid:
+      max_depth: [5, 10]
+      min_samples_split: [5]
+      min_samples_leaf: [2]
+
+  random_forest:
+    enabled: true
+    class_weight: balanced_subsample
+    param_grid:
+      n_estimators: [500]
+      max_depth: [5, 7]
+      min_samples_split: [10]
+      min_samples_leaf: [10, 20]
+      max_features: ["sqrt"]
