@@ -10,24 +10,26 @@ LINT_PATH     ?= src
 TEST_PATH     ?= src/tests
 CI_IMAGE      ?= diabetes-prediction-app
 
-.PHONY: help up down build-feast app lint test \
-	build-image push-image prepare train online-infer
-
+.PHONY: help
 help:
 	@echo "Local (docker compose):"
-	@echo "  make up           - bring up the infra (garage, mlflow, feast, ...)"
-	@echo "  make down         - tear down the infra"
-	@echo "  make build-feast  - build the feast server image"
-	@echo "  make run          - run the app pipeline (diabetes-app, profile 'app')"
+	@echo "  make up            - bring up the infra (garage, mlflow, feast, ...)"
+	@echo "  make down          - tear down the infra"
+	@echo "  make build-feast   - build the feast server image"
+	@echo "  make run           - run the app pipeline (diabetes-app, profile 'app')"
 	@echo ""
 	@echo "CI (pipeline stages):"
-	@echo "  make lint         - flake8 over $(LINT_PATH)"
-	@echo "  make test         - pytest over $(TEST_PATH)"
-	@echo "  make build-image  - docker buildx build -t \$$(CI_IMAGE) ."
-	@echo "  make push-image   - docker push \$$(CI_IMAGE)"
-	@echo "  make prepare      - python -m src.main prepare"
-	@echo "  make train        - python -m src.main train"
-	@echo "  make online-infer - python -m src.main online-infer"
+	@echo "  make lint          - flake8 over $(LINT_PATH)"
+	@echo "  make test          - pytest over $(TEST_PATH)"
+	@echo "  make build-image   - docker buildx build -t \$$(CI_IMAGE) ."
+	@echo "  make push-image    - docker push \$$(CI_IMAGE)"
+	@echo "  make prepare       - python -m src.main prepare"
+	@echo "  make train         - python -m src.main train"
+	@echo "  make online-infer  - python -m src.main online-infer"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make clean         - remove generated data artifacts (keeps data/raw)"
+	@echo "  make clean-reports - remove generated reports/ directory"
 
 # ---------------------------------------------------------------------------
 # Local: docker compose (see docker-compose.yml for service details)
@@ -71,3 +73,13 @@ train:
 
 online-infer:
 	$(PYTHON) -m src.main online-infer
+
+# ---------------------------------------------------------------------------
+# Cleanup: remove generated artifacts (keeps data/raw)
+# ---------------------------------------------------------------------------
+clean:
+	rm -rf data/processed
+	rm -f data/registry.db data/online_store.db
+
+clean-reports:
+	rm -rf reports
