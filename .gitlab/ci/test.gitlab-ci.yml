@@ -1,8 +1,18 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
 lint:
   stage: test
   image: python:3.10-slim
+  cache:
+    key:
+      prefix: lint-pip
+      files:
+        - requirements.txt
+    paths:
+      - .cache/pip
   before_script:
-    - pip install --no-cache-dir -r requirements.txt
+    - pip install flake8
   script:
     - echo "Running flake8 lint checks..."
     - python -m flake8 src --max-line-length=120
@@ -11,8 +21,15 @@ lint:
 test:
   stage: test
   image: python:3.10-slim
+  cache:
+    key:
+      prefix: test-pip
+      files:
+        - requirements.txt
+    paths:
+      - .cache/pip
   before_script:
-    - pip install --no-cache-dir -r requirements.txt
+    - pip install -r requirements.txt
   script:
     - echo "Running test suite in parallel (race mode)..."
     - python -m pytest src/tests -n auto
