@@ -1,0 +1,12 @@
+online-infer:
+  stage: online-infer
+  image: ${CI_IMAGE}
+  needs:
+    - build-images
+    - train
+  script:
+    - echo "Running online inference pipeline..."
+    # Materializes features into the Postgres online store, then fetches online
+    # features and predicts using the model from the MLflow registry.
+    - make online-infer
+    - echo "Online inference completed."

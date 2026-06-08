@@ -1,0 +1,38 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+.test_base:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends make
+
+lint:
+  extends: .test_base
+  cache:
+    key:
+      prefix: lint-pip
+      files:
+        - requirements.txt
+    paths:
+      - .cache/pip
+  script:
+    - pip install flake8
+    - echo "Running flake8 lint checks..."
+    - make lint
+    - echo "Lint checks passed."
+
+test:
+  extends: .test_base
+  cache:
+    key:
+      prefix: test-pip
+      files:
+        - requirements.txt
+    paths:
+      - .cache/pip
+  script:
+    - pip install -r requirements.txt
+    - echo "Running test suite in parallel (race mode)..."
+    - make test
+    - echo "Tests completed."

@@ -1,0 +1,16 @@
+train:
+  stage: train
+  image: ${CI_IMAGE}
+  needs:
+    - build-images
+    - prepare-data
+  script:
+    - echo "Running train pipeline..."
+    # Reads the training CSV; logs to MLflow (mlflow:5000) with artifacts on S3;
+    # pushes best-model metrics to the Pushgateway.
+    - make train
+    - echo "Train pipeline completed."
+  artifacts:
+    paths:
+      - reports/
+    expire_in: 1 week
