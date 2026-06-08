@@ -30,7 +30,7 @@ from sklearn.metrics import (
 from sklearn.dummy import DummyClassifier
 
 from imblearn.over_sampling import SMOTE
-from xgboost import XGBClassifier
+# from xgboost import XGBClassifier
 
 from src.evaluate import (
     compute_metrics,
@@ -40,6 +40,8 @@ from src.evaluate import (
 )
 
 from src.metrics import push_metrics
+from sklearn.ensemble import RandomForestClassifier
+
 
 # MLflow is enabled automatically when a tracking server is configured via the
 # MLFLOW_TRACKING_URI env var (e.g. http://mlflow:5000 on the cluster). With no
