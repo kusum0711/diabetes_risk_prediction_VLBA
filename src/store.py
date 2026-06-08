@@ -5,6 +5,7 @@ from src.config import load_config
 config = load_config()
 PROCESSED_PATH = Path(config["data"]["processed_path"])
 
+
 def save_data(df: pd.DataFrame, filename: str = "diabetes_processed.csv"):
     output_dir = PROCESSED_PATH.parent
     output_dir.mkdir(parents=True, exist_ok=True)

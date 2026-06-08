@@ -41,6 +41,8 @@ VALID_RANGES = {
 DOMAIN_MISSING_VALUES = {"BMI": 0}
 
 # load data
+
+
 def load_data(path=None) -> pd.DataFrame:
     if path is None:
         path = os.environ.get("RAW_DATA_PATH") or str(RAW_PATH)
@@ -128,6 +130,7 @@ def check_duplicates(df: pd.DataFrame) -> dict:
             "duplicate_percentage": round((duplicate_count / total_rows) * 100, 2) if total_rows else 0,
         },
     )
+
 
 def validate_data(df: pd.DataFrame, raise_error: bool = False) -> pd.DataFrame:
     checks = [

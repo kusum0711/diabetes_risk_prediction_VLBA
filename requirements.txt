@@ -27,3 +27,7 @@ joblib
 # Testing
 pytest
 pytest-cov
+pytest-xdist
+
+# Linting
+flake8

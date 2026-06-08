@@ -29,7 +29,7 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
                 config["data"][key] = resolve_data_path(config["data"][key])
 
     # Override MLflow tracking URI from environment variable if set
-    # This allows Docker to use http://mlflow:5000 
+    # This allows Docker to use http://mlflow:5000
     # while local uses http://localhost:5000
     env_uri = os.environ.get("MLFLOW_TRACKING_URI")
     if env_uri:

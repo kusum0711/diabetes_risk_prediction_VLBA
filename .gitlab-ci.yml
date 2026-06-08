@@ -1,4 +1,5 @@
 stages:
+  - test
   - build-images
   - prepare-data
   - train

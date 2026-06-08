@@ -3,26 +3,18 @@ import time
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
-from sklearn.utils.class_weight import compute_sample_weight
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 from sklearn.metrics import roc_auc_score
 
-
 import numpy as np
-
 
 from pathlib import Path
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 
 from sklearn.model_selection import (
     train_test_split,
-    GridSearchCV,
     RandomizedSearchCV,
     StratifiedKFold,
 )
@@ -100,11 +92,10 @@ if not MLFLOW_ENABLED:
                 return None
 
     # Override the mlflow module object in this namespace with a no-op stub
-    mlflow = _DummyMLflow()
+    mlflow = _DummyMLflow()  # noqa: F811
 
 
-
-# Data Preparation 
+# Data Preparation
 def prepare_data(df, config):
     target = config["model"]["target_column"]
     drop_cols = [target, "patient_id", "event_timestamp"]
@@ -119,7 +110,7 @@ def prepare_data(df, config):
     if y.nunique() > 2:
         print("Converting multiclass target to binary: 0 -> 0, 1/2 -> 1")
         y = (y >= 1).astype(int)
- 
+
     X = encode_categorical_features(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -144,6 +135,8 @@ def encode_categorical_features(X: pd.DataFrame) -> pd.DataFrame:
     return X
 
 # SMOTE
+
+
 def apply_smote(X_train, y_train, config):
     if not config["model"].get("use_smote", True):
         print(" SMOTE disabled in config.")
@@ -170,12 +163,12 @@ def apply_smote(X_train, y_train, config):
     return X_resampled, y_resampled
 
 
-# Scaling 
+# Scaling
 def scale_features(X_train, X_test):
     feature_names = X_train.columns.tolist()
 
     scaler = StandardScaler()
-    
+
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
@@ -193,10 +186,7 @@ def scale_features(X_train, X_test):
     return X_train_scaled, X_test_scaled, scaler
 
 
-
-
-
-# Baseline 
+# Baseline
 def train_baseline(X_train, X_test, y_train, y_test, config):
     print("\n--- Baseline: Dummy Classifier ---")
 
@@ -228,7 +218,7 @@ def train_baseline(X_train, X_test, y_train, y_test, config):
     }
 
 
-# Model Definitions 
+# Model Definitions
 def get_models(config):
     models = {}
     cfg = config["models"]
@@ -277,7 +267,9 @@ def get_models(config):
 
     return models
 
-# Feature Importance 
+# Feature Importance
+
+
 def save_feature_importance(
     model,
     model_name,
@@ -310,6 +302,7 @@ def save_feature_importance(
 
     return fi_df, fi_path
 
+
 def tune_multiclass_thresholds(
     y_true,
     y_probs,
@@ -337,12 +330,6 @@ def tune_multiclass_thresholds(
                 y_probs[:, cls] >= threshold
             ).astype(int)
             precision = precision_score(
-                y_true_binary,
-                y_pred_binary,
-                zero_division=0,
-            )
-
-            recall = recall_score(
                 y_true_binary,
                 y_pred_binary,
                 zero_division=0,
@@ -413,7 +400,9 @@ def apply_custom_thresholds(y_probs, thresholds):
 
     return np.array(predictions)
 
-# Train Single Model 
+# Train Single Model
+
+
 def train_model(
     name,
     model_def,
@@ -468,7 +457,7 @@ def train_model(
         print(f"  Best Params: {best_params}")
         print(f"  Training Time: {training_time:.2f}s")
 
-        #  Metrics 
+        #  Metrics
         train_metrics, _ = compute_metrics(
             best_model, X_train, y_train, prefix="train_"
         )
@@ -508,9 +497,8 @@ def train_model(
                 y_probs,
                 best_thresholds,
             )
-        
-        
-        # Test ROC AUC  
+
+        # Test ROC AUC
         if y_probs.shape[1] == 2:
 
             test_auc_roc = roc_auc_score(
@@ -564,9 +552,8 @@ def train_model(
             ),
 
             "test_auc_roc": test_auc_roc,
-        }   
+        }
 
-            
         # Human-readable target names
         if np.unique(y_test).size == 2:
             target_names = ['No Diabetes', 'Diabetes']
@@ -581,16 +568,15 @@ def train_model(
         print(f"\nClassification Report — {name}")
         print(report)
 
-        #  Overfitting 
+        #  Overfitting
         acc_gap, is_overfitting = detect_overfitting(
             train_metrics, test_metrics
         )
 
-        #  Confusion Matrix 
+        #  Confusion Matrix
         y_test_reset = pd.Series(y_test).reset_index(drop=True)
         cm = confusion_matrix(y_test_reset, y_pred)
         cm_path = save_confusion_matrix(cm, name, reports_dir)
-
 
         fi_output = save_feature_importance(
             best_model,
@@ -613,7 +599,7 @@ def train_model(
 
             hypothesis_results.extend(h_results)
 
-        #  Log to MLflow 
+        #  Log to MLflow
         mlflow.log_params(best_params)
         for cls, threshold in best_thresholds.items():
             mlflow.log_param(
@@ -630,7 +616,7 @@ def train_model(
         mlflow.log_param("model_name", name)
         mlflow.log_artifact(str(cm_path))
 
-        #  Model Report 
+        #  Model Report
         model_report = {
             "model_name": name,
             "best_params": str(best_params),
@@ -650,7 +636,7 @@ def train_model(
         mlflow.log_artifact(str(report_path))
         print(f"  📄 Model report saved: {report_path}")
 
-        #  Register Model 
+        #  Register Model
         if name == "xgboost":
             mlflow.xgboost.log_model(
                 best_model,
@@ -680,7 +666,6 @@ def train_model(
         }
 
 
-
 #  Main Entry Point
 def run_training(df, config):
 
@@ -692,24 +677,24 @@ def run_training(df, config):
     #  Load & Prepare ─
     X_train, X_test, y_train, y_test = prepare_data(df, config)
 
-    #  SMOTE 
+    #  SMOTE
     X_train, y_train = apply_smote(X_train, y_train, config)
 
-    #  Scale 
+    #  Scale
     # Scale copy only for linear models
     X_train_scaled, X_test_scaled, scaler = scale_features(X_train, X_test)
 
-    #  Baseline 
+    #  Baseline
     baseline_metrics = train_baseline(X_train, X_test, y_train, y_test, config)
 
-    #  Train All Models 
+    #  Train All Models
     models = get_models(config)
     results = []
     hypothesis_results = []
 
     for name, model_def in models.items():
 
-    # Only Logistic Regression uses scaled data
+        # Only Logistic Regression uses scaled data
         if name == "logistic_regression":
             X_train_model = X_train_scaled
             X_test_model = X_test_scaled
@@ -732,13 +717,13 @@ def run_training(df, config):
 
         results.append(result)
 
-    #  Model Assessment Report 
+    #  Model Assessment Report
     assessment_df = pd.DataFrame([r["model_report"] for r in results])
     assessment_path = reports_dir / "model_assessment_report.csv"
     assessment_df.to_csv(assessment_path, index=False)
     print(f"\n📄 Model assessment report saved: {assessment_path}")
 
-    #  Overfitting Report 
+    #  Overfitting Report
     overfitting_df = assessment_df[[
         "model_name",
         "train_accuracy",
@@ -753,7 +738,7 @@ def run_training(df, config):
     overfitting_df.to_csv(overfitting_path, index=False)
     print(f"📄 Overfitting report saved: {overfitting_path}")
 
-    #  Hypothesis Report 
+    #  Hypothesis Report
     if hypothesis_results:
         hypothesis_df = pd.DataFrame(hypothesis_results)
         hypothesis_path = reports_dir / "hypothesis_report.csv"

@@ -6,7 +6,6 @@ import urllib.error
 import urllib.request
 
 import pandas as pd
-import mlflow
 
 from src.feast_utils import FEATURES
 

@@ -1,0 +1,19 @@
+lint:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - pip install --no-cache-dir -r requirements.txt
+  script:
+    - echo "Running flake8 lint checks..."
+    - python -m flake8 src --max-line-length=120
+    - echo "Lint checks passed."
+
+test:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - pip install --no-cache-dir -r requirements.txt
+  script:
+    - echo "Running test suite in parallel (race mode)..."
+    - python -m pytest src/tests -n auto
+    - echo "Tests completed."

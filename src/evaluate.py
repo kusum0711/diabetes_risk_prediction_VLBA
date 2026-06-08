@@ -4,13 +4,11 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
-    confusion_matrix,
     classification_report,
     ConfusionMatrixDisplay,
 )
 import pandas as pd
 import matplotlib.pyplot as plt
-
 
 
 def compute_metrics(model, X, y, prefix=""):
@@ -83,7 +81,7 @@ def compute_metrics(model, X, y, prefix=""):
     return metrics, y_pred
 
 
-# Overfitting Detection 
+# Overfitting Detection
 
 def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
 
@@ -92,9 +90,8 @@ def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
 
     acc_gap = train_acc - test_acc
 
-
     is_overfitting = (
-        acc_gap > threshold 
+        acc_gap > threshold
     )
 
     print(
@@ -158,6 +155,8 @@ HYPOTHESES = {
         "Age_cat_Young",
     ],
 }
+
+
 def evaluate_hypotheses(model_name, feature_names, importances):
     results = []
     fi_dict = dict(zip(feature_names, importances))
