@@ -1,0 +1,30 @@
+workflow:
+
+# Example stages 
+
+stages:
+  - build-images
+  - data
+  - train
+  - infer
+  - online-infer
+  - extend-data
+  - extend-train
+  - online-infer-v2
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  BUILDKIT_PROGRESS: "plain"
+  DATASET_IMAGE: "${CI_REGISTRY_IMAGE}/dataset-generator:${CI_COMMIT_SHORT_SHA}"
+  ISOFOREST_IMAGE: "${CI_REGISTRY_IMAGE}/isolation-forest:${CI_COMMIT_SHORT_SHA}"
+  FEAST_IMAGE: "${CI_REGISTRY_IMAGE}/feast:${CI_COMMIT_SHORT_SHA}"
+  PUSHGATEWAY_URL: "http://pushgateway:9091/pushgateway"
+  MLFLOW_TRACKING_URI: "http://mlflow:5000"
+  FEAST_URL: "http://feast:6000"
+  S3_ENDPOINT: "http://garage:3900"
+  AWS_ENDPOINT_URL: "http://garage:3900"
+  AWS_ENDPOINT_URL_S3: "http://garage:3900"
+  AWS_REGION: "garage"
+  AWS_DEFAULT_REGION: "garage"
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
