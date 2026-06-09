@@ -17,6 +17,7 @@ help:
 	@echo "  make down          - tear down the infra"
 	@echo "  make build-feast   - build the feast server image"
 	@echo "  make run           - run the app pipeline (diabetes-app, profile 'app')"
+	@echo "  make build-app     - build the diabetes-app image via docker compose"
 	@echo ""
 	@echo "CI (pipeline stages):"
 	@echo "  make lint          - flake8 over $(LINT_PATH)"
@@ -44,7 +45,11 @@ build-feast:
 	$(COMPOSE) build feast
 
 run:
+	$(COMPOSE) --profile app build diabetes-app
 	$(COMPOSE) --profile app up diabetes-app
+
+build-app:
+	$(COMPOSE) --profile app build diabetes-app
 
 # ---------------------------------------------------------------------------
 # CI: test & lint (used by .gitlab/ci/test.gitlab-ci.yml)

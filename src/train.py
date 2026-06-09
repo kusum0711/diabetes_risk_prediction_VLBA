@@ -30,7 +30,7 @@ from sklearn.metrics import (
 from sklearn.dummy import DummyClassifier
 
 from imblearn.over_sampling import SMOTE
-# from xgboost import XGBClassifier
+from xgboost import XGBClassifier
 
 from src.evaluate import (
     compute_metrics,
@@ -232,18 +232,18 @@ def get_models(config):
     #         "param_grid": cfg["logistic_regression"]["param_grid"],
     #     }
 
-    if cfg["random_forest"]["enabled"]:
-        models["random_forest"] = {
-            "model": RandomForestClassifier(
-                random_state=random_state,
-                class_weight=cfg["random_forest"].get(
-                    "class_weight",
-                    "balanced_subsample",
-                ),
-                n_jobs=1,
-            ),
-            "param_grid": cfg["random_forest"]["param_grid"],
-        }
+    # if cfg["random_forest"]["enabled"]:
+    #     models["random_forest"] = {
+    #         "model": RandomForestClassifier(
+    #             random_state=random_state,
+    #             class_weight=cfg["random_forest"].get(
+    #                 "class_weight",
+    #                 "balanced_subsample",
+    #             ),
+    #             n_jobs=1,
+    #         ),
+    #         "param_grid": cfg["random_forest"]["param_grid"],
+    #     }
 
     # if cfg["decision_tree"]["enabled"]:
     #     models["decision_tree"] = {
@@ -251,21 +251,21 @@ def get_models(config):
     #         "param_grid": cfg["decision_tree"]["param_grid"],
     #     }
 
-    # if cfg["xgboost"]["enabled"]:
-    #     models["xgboost"] = {
-    #         "model": XGBClassifier(
-    #             random_state=random_state,
-    #             eval_metric="logloss",
-    #             objective="binary:logistic",
+    if cfg["xgboost"]["enabled"]:
+        models["xgboost"] = {
+            "model": XGBClassifier(
+                random_state=random_state,
+                eval_metric="logloss",
+                objective="binary:logistic",
 
-    #             tree_method="hist",
-    #             n_jobs=-1,
+                tree_method="hist",
+                n_jobs=-1,
 
-    #             reg_alpha=0.1,
-    #             reg_lambda=1.0,
-    #         ),
-    #         "param_grid": cfg["xgboost"]["param_grid"],
-    #     }
+                reg_alpha=0.1,
+                reg_lambda=1.0,
+            ),
+            "param_grid": cfg["xgboost"]["param_grid"],
+        }
 
     return models
 
@@ -516,44 +516,43 @@ def train_model(
                 multi_class="ovr",
                 average="weighted",
             )
-        # Compute test metrics manually
+        # Per-class arrays for test set (using tuned-threshold y_pred)
+        test_per_class_precision = precision_score(y_test, y_pred, average=None, zero_division=0)
+        test_per_class_recall = recall_score(y_test, y_pred, average=None, zero_division=0)
+        test_per_class_f1 = f1_score(y_test, y_pred, average=None, zero_division=0)
 
+        # Compute test metrics
         test_metrics = {
+            # Overall accuracy
+            "test_accuracy": accuracy_score(y_test, y_pred),
 
-            "test_accuracy": accuracy_score(
-                y_test,
-                y_pred,
+            # Weighted averages
+            "test_precision_weighted": precision_score(
+                y_test, y_pred, average="weighted", zero_division=0,
             ),
-
-            "test_precision_macro": precision_score(
-                y_test,
-                y_pred,
-                average="macro",
-                zero_division=0,
-            ),
-
-            "test_recall_macro": recall_score(
-                y_test,
-                y_pred,
-                average="macro",
-                zero_division=0,
-            ),
-
             "test_recall_weighted": recall_score(
-                y_test,
-                y_pred,
-                average="weighted",
-                zero_division=0,
+                y_test, y_pred, average="weighted", zero_division=0,
+            ),
+            "test_f1_weighted": f1_score(
+                y_test, y_pred, average="weighted", zero_division=0,
             ),
 
-            "test_f1_macro": f1_score(
-                y_test,
-                y_pred,
-                average="macro",
-                zero_division=0,
+            # Macro recall
+            "test_recall_macro": recall_score(
+                y_test, y_pred, average="macro", zero_division=0,
             ),
 
+            # ROC AUC
             "test_auc_roc": test_auc_roc,
+
+            # Per-class: class 0 = Non-Diabetes, class 1 = Diabetes
+            "test_precision_class_0": float(test_per_class_precision[0]),
+            "test_recall_class_0": float(test_per_class_recall[0]),
+            "test_f1_class_0": float(test_per_class_f1[0]),
+
+            "test_precision_class_1": float(test_per_class_precision[1]),
+            "test_recall_class_1": float(test_per_class_recall[1]),
+            "test_f1_class_1": float(test_per_class_f1[1]),
         }
 
         # Human-readable target names
@@ -753,13 +752,28 @@ def run_training(df, config):
             results,
             key=lambda r: r["test_metrics"]["test_recall_macro"],
         )
+        tm = best["test_metrics"]
         push_metrics(
             job="diabetes_train",
             metrics={
-                "diabetes_best_test_recall_macro": best["test_metrics"]["test_recall_macro"],
-                "diabetes_best_test_f1_macro": best["test_metrics"]["test_f1_macro"],
-                "diabetes_best_test_accuracy": best["test_metrics"]["test_accuracy"],
-                "diabetes_best_test_auc_roc": best["test_metrics"]["test_auc_roc"],
+                # Overall
+                "diabetes_best_test_accuracy": tm["test_accuracy"],
+                "diabetes_best_test_auc_roc": tm["test_auc_roc"],
+
+                # Macro recall
+                "diabetes_best_test_recall_macro": tm["test_recall_macro"],
+
+                # Class 0 — Non-Diabetes
+                "nondiabetes_best_test_precision": tm["test_precision_class_0"],
+                "nondiabetes_best_test_recall": tm["test_recall_class_0"],
+                "nondiabetes_best_test_f1": tm["test_f1_class_0"],
+                "nondiabetes_best_test_auc_roc": tm["test_auc_roc"],
+
+                # Class 1 — Diabetes
+                "diabetes_best_test_precision": tm["test_precision_class_1"],
+                "diabetes_best_test_recall": tm["test_recall_class_1"],
+                "diabetes_best_test_f1": tm["test_f1_class_1"],
+                "diabetes_best_test_auc_roc": tm["test_auc_roc"],
             },
             grouping={"model": best["model_name"]},
         )
