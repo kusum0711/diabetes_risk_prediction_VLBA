@@ -30,7 +30,7 @@ from sklearn.metrics import (
 from sklearn.dummy import DummyClassifier
 
 from imblearn.over_sampling import SMOTE
-from xgboost import XGBClassifier
+# from xgboost import XGBClassifier
 
 from src.evaluate import (
     compute_metrics,
@@ -40,7 +40,7 @@ from src.evaluate import (
 )
 
 from src.metrics import push_metrics
-# from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 
 # MLflow is enabled automatically when a tracking server is configured via the
@@ -233,18 +233,18 @@ def get_models(config):
     #         "param_grid": cfg["logistic_regression"]["param_grid"],
     #     }
 
-    # if cfg["random_forest"]["enabled"]:
-    #     models["random_forest"] = {
-    #         "model": RandomForestClassifier(
-    #             random_state=random_state,
-    #             class_weight=cfg["random_forest"].get(
-    #                 "class_weight",
-    #                 "balanced_subsample",
-    #             ),
-    #             n_jobs=1,
-    #         ),
-    #         "param_grid": cfg["random_forest"]["param_grid"],
-    #     }
+    if cfg["random_forest"]["enabled"]:
+        models["random_forest"] = {
+            "model": RandomForestClassifier(
+                random_state=random_state,
+                class_weight=cfg["random_forest"].get(
+                    "class_weight",
+                    "balanced_subsample",
+                ),
+                n_jobs=1,
+            ),
+            "param_grid": cfg["random_forest"]["param_grid"],
+        }
 
     # if cfg["decision_tree"]["enabled"]:
     #     models["decision_tree"] = {
@@ -252,21 +252,21 @@ def get_models(config):
     #         "param_grid": cfg["decision_tree"]["param_grid"],
     #     }
 
-    if cfg["xgboost"]["enabled"]:
-        models["xgboost"] = {
-            "model": XGBClassifier(
-                random_state=random_state,
-                eval_metric="logloss",
-                objective="binary:logistic",
+    # if cfg["xgboost"]["enabled"]:
+    #     models["xgboost"] = {
+    #         "model": XGBClassifier(
+    #             random_state=random_state,
+    #             eval_metric="logloss",
+    #             objective="binary:logistic",
 
-                tree_method="hist",
-                n_jobs=-1,
+    #             tree_method="hist",
+    #             n_jobs=-1,
 
-                reg_alpha=0.1,
-                reg_lambda=1.0,
-            ),
-            "param_grid": cfg["xgboost"]["param_grid"],
-        }
+    #             reg_alpha=0.1,
+    #             reg_lambda=1.0,
+    #         ),
+    #         "param_grid": cfg["xgboost"]["param_grid"],
+    #     }
 
     return models
 
