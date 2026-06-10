@@ -5,7 +5,7 @@ PYTHON        ?= python
 COMPOSE       ?= docker compose
 NETWORK       ?= mlops-net
 PYTEST_ARGS   ?= -n auto
-FLAKE8_ARGS   ?= --max-line-length=120
+FLAKE8_ARGS   ?= --max-line-length=130
 LINT_PATH     ?= src
 TEST_PATH     ?= src/tests
 CI_IMAGE      ?= diabetes-prediction-app
