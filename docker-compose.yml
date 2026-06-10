@@ -143,7 +143,46 @@ services:
   pushgateway:
     image: prom/pushgateway:latest
     network_mode: host
-  
+
+  # Scrapes the pushgateway (localhost:9091) every few seconds and stores the
+  # metrics. UI on http://localhost:9090.
+  prometheus:
+    image: prom/prometheus:latest
+    depends_on:
+      pushgateway:
+        condition: service_started
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    network_mode: host
+    restart: unless-stopped
+
+  # Dashboards on http://localhost:3000 (login admin / admin). The Prometheus
+  # datasource is auto-provisioned from monitoring/grafana/datasources.yml.
+  grafana:
+    # Grafana 12.4 — exposes the GA app-platform dashboard API
+    # (dashboard.grafana.app/v2) and the working classic→v2 backend conversion,
+    # matching the server. The -ubuntu (glibc) variant is used because the
+    # default Alpine image fails to start on this WSL2 kernel (libreadline
+    # symbol relocation errors in /run.sh).
+    image: grafana/grafana:12.4.4-ubuntu
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # Enable the app-platform dashboard API + v2 schema (dashboard.grafana.app/v2),
+      # so file provisioning ingests the v2-layout dashboards (matches the server).
+      GF_FEATURE_TOGGLES_ENABLE: "kubernetesDashboards,dashboardNewLayouts"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    network_mode: host
+    restart: unless-stopped
+
   diabetes-app:
     # Behind the `app` profile so a plain `docker compose up -d` brings up only
     # the infra (what gitlab-ci-local uses) without running the pipeline.
@@ -182,3 +221,5 @@ volumes:
   garage-data:
   pg-data:
   mlflow-data:
+  prometheus-data:
+  grafana-data:
