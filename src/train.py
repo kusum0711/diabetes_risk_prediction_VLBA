@@ -40,7 +40,7 @@ from src.evaluate import (
 )
 
 from src.metrics import push_metrics
-from sklearn.ensemble import RandomForestClassifier
+# from sklearn.ensemble import RandomForestClassifier
 
 
 # MLflow is enabled automatically when a tracking server is configured via the
@@ -202,20 +202,21 @@ def train_baseline(X_train, X_test, y_train, y_test, config):
     y_test_reset = pd.Series(y_test).reset_index(drop=True)
 
     baseline_acc = accuracy_score(y_test_reset, y_pred)
-    baseline_recall = recall_score(
-        y_test_reset, y_pred, average="macro", zero_division=0
+    # Class-1 (diabetes) recall — the metric we prioritise across the pipeline.
+    baseline_diabetes_recall = recall_score(
+        y_test_reset, y_pred, labels=[1], average="macro", zero_division=0
     )
     baseline_f1 = f1_score(
         y_test_reset, y_pred, average="macro", zero_division=0
     )
 
     print(f"  Baseline Accuracy: {baseline_acc:.4f}")
-    print(f"  Baseline Recall:   {baseline_recall:.4f}")
+    print(f"  Baseline Diabetes Recall: {baseline_diabetes_recall:.4f}")
     print(f"  Baseline F1:       {baseline_f1:.4f}")
 
     return {
         "baseline_accuracy": baseline_acc,
-        "baseline_recall": baseline_recall,
+        "baseline_diabetes_recall": baseline_diabetes_recall,
         "baseline_f1": baseline_f1,
     }
 
@@ -434,7 +435,7 @@ def train_model(
         param_distributions=model_def["param_grid"],
         n_iter=config["model"].get("random_search_n_iter", 30),
         cv=cv,
-        scoring="recall_macro",  # primary metric is recall_macro
+        scoring="recall",  # primary metric: recall of class 1 (diabetes); binary recall defaults to pos_label=1
         n_jobs=-1,
         verbose=1,
         random_state=config["model"]["random_state"],
@@ -612,7 +613,7 @@ def train_model(
         mlflow.log_metric("training_time_seconds", training_time)
         mlflow.log_metric("accuracy_overfitting_gap", acc_gap)
         mlflow.log_metric("baseline_accuracy", baseline_metrics["baseline_accuracy"])
-        mlflow.log_metric("baseline_recall", baseline_metrics["baseline_recall"])
+        mlflow.log_metric("baseline_diabetes_recall", baseline_metrics["baseline_diabetes_recall"])
         mlflow.log_param("is_overfitting", str(is_overfitting))
         mlflow.log_param("model_name", name)
         mlflow.log_artifact(str(cm_path))
@@ -627,9 +628,9 @@ def train_model(
             "accuracy_overfitting_gap": round(acc_gap, 4),
             "is_overfitting": is_overfitting,
             "baseline_accuracy": round(baseline_metrics["baseline_accuracy"], 4),
-            "baseline_recall": round(baseline_metrics["baseline_recall"], 4),
+            "baseline_diabetes_recall": round(baseline_metrics["baseline_diabetes_recall"], 4),
             "beats_baseline_accuracy": test_metrics["test_accuracy"] > baseline_metrics["baseline_accuracy"],
-            "beats_baseline_recall": test_metrics["test_recall_macro"] > baseline_metrics["baseline_recall"],
+            "beats_baseline_diabetes_recall": test_metrics["test_recall_class_1"] > baseline_metrics["baseline_diabetes_recall"],
         }
 
         report_path = reports_dir / f"model_report_{name}.csv"
@@ -750,30 +751,30 @@ def run_training(df, config):
     if results:
         best = max(
             results,
-            key=lambda r: r["test_metrics"]["test_recall_macro"],
+            key=lambda r: r["test_metrics"]["test_recall_class_1"],
         )
         tm = best["test_metrics"]
         push_metrics(
             job="diabetes_train",
             metrics={
                 # Overall
-                "diabetes_best_test_accuracy": tm["test_accuracy"],
-                "diabetes_best_test_auc_roc": tm["test_auc_roc"],
+                "best_test_accuracy": tm["test_accuracy"],
+                "best_test_auc_roc": tm["test_auc_roc"],
 
                 # Macro recall
-                "diabetes_best_test_recall_macro": tm["test_recall_macro"],
+                "best_test_recall_macro": tm["test_recall_macro"],
 
                 # Class 0 — Non-Diabetes
-                "nondiabetes_best_test_precision": tm["test_precision_class_0"],
-                "nondiabetes_best_test_recall": tm["test_recall_class_0"],
-                "nondiabetes_best_test_f1": tm["test_f1_class_0"],
-                "nondiabetes_best_test_auc_roc": tm["test_auc_roc"],
+                "best_test_precision_class_0": tm["test_precision_class_0"],
+                "best_test_recall_class_0": tm["test_recall_class_0"],
+                "best_test_f1_class_0": tm["test_f1_class_0"],
+                "best_test_auc_roc_class_0": tm["test_auc_roc"],
 
                 # Class 1 — Diabetes
-                "diabetes_best_test_precision": tm["test_precision_class_1"],
-                "diabetes_best_test_recall": tm["test_recall_class_1"],
-                "diabetes_best_test_f1": tm["test_f1_class_1"],
-                "diabetes_best_test_auc_roc": tm["test_auc_roc"],
+                "best_test_precision_class_1": tm["test_precision_class_1"],
+                "best_test_recall_class_1": tm["test_recall_class_1"],
+                "best_test_f1_class_1": tm["test_f1_class_1"],
+                "best_test_auc_roc_class_1": tm["test_auc_roc"],
             },
             grouping={"model": best["model_name"]},
         )
