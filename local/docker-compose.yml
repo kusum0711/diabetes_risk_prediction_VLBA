@@ -43,7 +43,7 @@ services:
       garage:
         condition: service_healthy
     volumes:
-      - ./data/raw:/data/raw:ro
+      - ../data/raw:/data/raw:ro
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://localhost:3900 minioadmin minioadmin; do echo 'waiting for garage'; sleep 2; done;
@@ -82,7 +82,8 @@ services:
       createbuckets:
         condition: service_completed_successfully
     environment:
-      MLFLOW_S3_ENDPOINT_URL: http://localhost:3900
+      # host.docker.internal reaches the garage container (network_mode: host)
+      # from this bridge-networked container on both Windows and Linux.
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_REGION: garage
@@ -94,9 +95,9 @@ services:
       --default-artifact-root s3://mlflow"
     volumes:
       - mlflow-data:/mlflow
-    network_mode: host
+    ports:
+      - "5050:5050"
     healthcheck:
-      # python is always present in the mlflow image; /health is served once up.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5050/health')"]
       interval: 5s
       timeout: 5s
@@ -106,8 +107,8 @@ services:
   # Feast online feature server (built from Dockerfile.feast).
   feast:
     build:
-      context: .
-      dockerfile: Dockerfile.feast
+      context: ..
+      dockerfile: local/Dockerfile.feast
     image: ${FEAST_IMAGE:-team4-feast:local}
     # Wait until the buckets exist (garage reachable). `feast apply` still needs
     # the offline parquet, which the prepare stage produces; until then this
@@ -142,13 +143,52 @@ services:
   pushgateway:
     image: prom/pushgateway:latest
     network_mode: host
-  
+
+  # Scrapes the pushgateway (localhost:9091) every few seconds and stores the
+  # metrics. UI on http://localhost:9090.
+  prometheus:
+    image: prom/prometheus:latest
+    depends_on:
+      pushgateway:
+        condition: service_started
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    network_mode: host
+    restart: unless-stopped
+
+  # Dashboards on http://localhost:3000 (login admin / admin). The Prometheus
+  # datasource is auto-provisioned from monitoring/grafana/datasources.yml.
+  grafana:
+    # Grafana 12.4 — exposes the GA app-platform dashboard API
+    # (dashboard.grafana.app/v2) and the working classic→v2 backend conversion,
+    # matching the server. The -ubuntu (glibc) variant is used because the
+    # default Alpine image fails to start on this WSL2 kernel (libreadline
+    # symbol relocation errors in /run.sh).
+    image: grafana/grafana:12.4.4-ubuntu
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # Enable the app-platform dashboard API + v2 schema (dashboard.grafana.app/v2),
+      # so file provisioning ingests the v2-layout dashboards (matches the server).
+      GF_FEATURE_TOGGLES_ENABLE: "kubernetesDashboards,dashboardNewLayouts"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    network_mode: host
+    restart: unless-stopped
+
   diabetes-app:
     # Behind the `app` profile so a plain `docker compose up -d` brings up only
     # the infra (what gitlab-ci-local uses) without running the pipeline.
     profiles: ["app"]
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     # image: ${IMAGE:-team4-diabetes-app:local}
     # Wait for the infra the prepare+train pipeline actually uses: buckets
@@ -165,7 +205,6 @@ services:
         condition: service_started
     environment:
       MLFLOW_TRACKING_URI: http://localhost:5050
-      MLFLOW_S3_ENDPOINT_URL: http://localhost:3900
       FEAST_URL: http://localhost:6000
       PUSHGATEWAY_URL: http://localhost:9091
       RAW_DATA_PATH: s3://datasets/diabetes.csv
@@ -182,3 +221,5 @@ volumes:
   garage-data:
   pg-data:
   mlflow-data:
+  prometheus-data:
+  grafana-data:

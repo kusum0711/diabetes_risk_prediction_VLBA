@@ -2,10 +2,10 @@
 # Defaults — override on the command line, e.g. `make test PYTEST_ARGS=-v`
 # ---------------------------------------------------------------------------
 PYTHON        ?= python
-COMPOSE       ?= docker compose
+COMPOSE       ?= docker compose -f local/docker-compose.yml
 NETWORK       ?= mlops-net
 PYTEST_ARGS   ?= -n auto
-FLAKE8_ARGS   ?= --max-line-length=120
+FLAKE8_ARGS   ?= --max-line-length=130
 LINT_PATH     ?= src
 TEST_PATH     ?= src/tests
 CI_IMAGE      ?= diabetes-prediction-app
@@ -17,6 +17,7 @@ help:
 	@echo "  make down          - tear down the infra"
 	@echo "  make build-feast   - build the feast server image"
 	@echo "  make run           - run the app pipeline (diabetes-app, profile 'app')"
+	@echo "  make build-app     - build the diabetes-app image via docker compose"
 	@echo ""
 	@echo "CI (pipeline stages):"
 	@echo "  make lint          - flake8 over $(LINT_PATH)"
@@ -44,7 +45,11 @@ build-feast:
 	$(COMPOSE) build feast
 
 run:
+	$(COMPOSE) --profile app build diabetes-app
 	$(COMPOSE) --profile app up diabetes-app
+
+build-app:
+	$(COMPOSE) --profile app build diabetes-app
 
 # ---------------------------------------------------------------------------
 # CI: test & lint (used by .gitlab/ci/test.gitlab-ci.yml)

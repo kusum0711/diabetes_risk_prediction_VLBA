@@ -27,56 +27,44 @@ def compute_metrics(model, X, y, prefix=""):
         )
     )
 
+    # Per-class arrays (index = class label)
+    per_class_precision = precision_score(y, y_pred, average=None, zero_division=0)
+    per_class_recall = recall_score(y, y_pred, average=None, zero_division=0)
+    per_class_f1 = f1_score(y, y_pred, average=None, zero_division=0)
+
     metrics = {
-        # Standard Metrics
+        # Overall accuracy
         f"{prefix}accuracy": accuracy_score(y, y_pred),
 
-        # Weighted Metrics
+        # Weighted averages
         f"{prefix}precision_weighted": precision_score(
-            y, y_pred,
-            average="weighted",
-            zero_division=0
+            y, y_pred, average="weighted", zero_division=0
         ),
-
         f"{prefix}recall_weighted": recall_score(
-            y, y_pred,
-            average="weighted",
-            zero_division=0
+            y, y_pred, average="weighted", zero_division=0
         ),
-
         f"{prefix}f1_weighted": f1_score(
-            y, y_pred,
-            average="weighted",
-            zero_division=0
+            y, y_pred, average="weighted", zero_division=0
         ),
 
-        #  Macro Metrics
-        f"{prefix}precision_macro": precision_score(
-            y, y_pred,
-            average="macro",
-            zero_division=0
-        ),
-
+        # Macro recall
         f"{prefix}recall_macro": recall_score(
-            y, y_pred,
-            average="macro",
-            zero_division=0
+            y, y_pred, average="macro", zero_division=0
         ),
 
-        f"{prefix}f1_macro": f1_score(
-            y, y_pred,
-            average="macro",
-            zero_division=0
-        ),
-
-        #  ROC AUC
-        # For binary problems pass the positive class scores; for multiclass use multi_class OVR
+        # ROC AUC (binary: positive-class scores; multiclass: OVR weighted)
         f"{prefix}auc_roc": (
             roc_auc_score(y, y_proba[:, 1])
             if (hasattr(y_proba, 'shape') and y_proba.ndim == 2 and y_proba.shape[1] == 2)
             else roc_auc_score(y, y_proba, multi_class="ovr", average="weighted")
         ),
     }
+
+    # Per-class precision / recall / f1
+    for i, (p, r, f) in enumerate(zip(per_class_precision, per_class_recall, per_class_f1)):
+        metrics[f"{prefix}precision_class_{i}"] = float(p)
+        metrics[f"{prefix}recall_class_{i}"] = float(r)
+        metrics[f"{prefix}f1_class_{i}"] = float(f)
 
     return metrics, y_pred
 
