@@ -37,7 +37,7 @@
         "kind": "Panel",
         "spec": {
           "id": 10,
-          "title": "Recall — Non-Diabetes",
+          "title": "Recall - Non-Diabetes",
           "description": "",
           "links": [],
           "data": {
@@ -125,7 +125,7 @@
         "kind": "Panel",
         "spec": {
           "id": 11,
-          "title": "Precision — Non-Diabetes",
+          "title": "Precision - Non-Diabetes",
           "description": "",
           "links": [],
           "data": {
@@ -213,7 +213,7 @@
         "kind": "Panel",
         "spec": {
           "id": 12,
-          "title": "F1 — Non-Diabetes",
+          "title": "F1 - Non-Diabetes",
           "description": "",
           "links": [],
           "data": {
@@ -490,7 +490,7 @@
         "spec": {
           "id": 15,
           "title": "Metrics over training runs",
-          "description": "Each push from a training run appears as a new point — track drift/improvement across runs.",
+          "description": "Each push from a training run appears as a new point - track drift/improvement across runs.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -897,8 +897,8 @@
         "kind": "Panel",
         "spec": {
           "id": 6,
-          "title": "Recall / Sensitivity — Diabetes",
-          "description": "Share of actual diabetics correctly flagged. The most important metric for a screening tool — low recall = missed patients.",
+          "title": "Recall / Sensitivity - Diabetes",
+          "description": "Share of actual diabetics correctly flagged. The most important metric for a screening tool - low recall = missed patients.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -985,7 +985,7 @@
         "kind": "Panel",
         "spec": {
           "id": 7,
-          "title": "Precision — Diabetes",
+          "title": "Precision - Diabetes",
           "description": "",
           "links": [],
           "data": {
@@ -1073,7 +1073,7 @@
         "kind": "Panel",
         "spec": {
           "id": 8,
-          "title": "F1 — Diabetes",
+          "title": "F1 - Diabetes",
           "description": "",
           "links": [],
           "data": {
@@ -1165,7 +1165,7 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Headline — Best Selected Model",
+              "title": "Headline - Best Selected Model",
               "collapse": false,
               "layout": {
                 "kind": "GridLayout",
@@ -1218,7 +1218,7 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Class 1 — Diabetes (clinical priority: minimise missed cases)",
+              "title": "Class 1 - Diabetes (clinical priority: minimise missed cases)",
               "collapse": false,
               "layout": {
                 "kind": "GridLayout",
@@ -1271,7 +1271,7 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Class 0 — Non-Diabetes",
+              "title": "Class 0 - Non-Diabetes",
               "collapse": false,
               "layout": {
                 "kind": "GridLayout",
@@ -1392,7 +1392,7 @@
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
-    "title": "Diabetes Risk Model — Best Run",
+    "title": "Diabetes Risk Model - Best Run",
     "variables": [
       {
         "kind": "QueryVariable",

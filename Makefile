@@ -2,7 +2,7 @@
 # Defaults — override on the command line, e.g. `make test PYTEST_ARGS=-v`
 # ---------------------------------------------------------------------------
 PYTHON        ?= python
-COMPOSE       ?= docker compose
+COMPOSE       ?= docker compose -f local/docker-compose.yml
 NETWORK       ?= mlops-net
 PYTEST_ARGS   ?= -n auto
 FLAKE8_ARGS   ?= --max-line-length=130

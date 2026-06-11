@@ -43,7 +43,7 @@ services:
       garage:
         condition: service_healthy
     volumes:
-      - ./data/raw:/data/raw:ro
+      - ../data/raw:/data/raw:ro
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://localhost:3900 minioadmin minioadmin; do echo 'waiting for garage'; sleep 2; done;
@@ -107,8 +107,8 @@ services:
   # Feast online feature server (built from Dockerfile.feast).
   feast:
     build:
-      context: .
-      dockerfile: Dockerfile.feast
+      context: ..
+      dockerfile: local/Dockerfile.feast
     image: ${FEAST_IMAGE:-team4-feast:local}
     # Wait until the buckets exist (garage reachable). `feast apply` still needs
     # the offline parquet, which the prepare stage produces; until then this
@@ -188,7 +188,7 @@ services:
     # the infra (what gitlab-ci-local uses) without running the pipeline.
     profiles: ["app"]
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     # image: ${IMAGE:-team4-diabetes-app:local}
     # Wait for the infra the prepare+train pipeline actually uses: buckets
