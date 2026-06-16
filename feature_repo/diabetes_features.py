@@ -1,8 +1,9 @@
 import os
 
 from datetime import timedelta
+from pathlib import Path
 
-from feast import Entity, FeatureView, Field, FileSource
+from feast import Entity, FeatureService, FeatureView, Field, FileSource
 from feast.types import Float32
 
 
@@ -15,10 +16,13 @@ patient = Entity(
 # Feature data location is environment-aware: local parquet by default, or an
 # S3/Garage object when FEAST_SOURCE_PATH is set (s3://feast/...). The custom
 # S3 endpoint (MinIO locally, Garage on the cluster) comes from AWS_ENDPOINT_URL.
-FEAST_SOURCE_PATH = os.environ.get(
-    "FEAST_SOURCE_PATH",
-    "/app/data/processed/diabetes_features.parquet",
+#
+# Default resolves relative to this file (feature_repo/../data/...) so it works
+# both inside Docker (/app/feature_repo/...) and from any local working directory.
+_DEFAULT_PARQUET = str(
+    (Path(__file__).parent.parent / "data/processed/diabetes_features.parquet").resolve()
 )
+FEAST_SOURCE_PATH = os.environ.get("FEAST_SOURCE_PATH", _DEFAULT_PARQUET)
 
 diabetes_source = FileSource(
     path=FEAST_SOURCE_PATH,
@@ -60,4 +64,9 @@ diabetes_feature_view = FeatureView(
         # Field(name="age_metabolic_risk", dtype=Float32),
     ],
     source=diabetes_source,
+)
+
+diabetes_feature_service = FeatureService(
+    name="diabetes_feature_service",
+    features=[diabetes_feature_view],
 )

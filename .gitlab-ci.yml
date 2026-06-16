@@ -26,6 +26,10 @@ variables:
   FEAST_URL: "http://feast:6000"
   PUSHGATEWAY_URL: "http://pushgateway:9091/pushgateway"
 
+  # Feature access mode: online -> Feast REST server (FEAST_URL) for
+  # materialize + the prediction API's get-online-features; offline -> local.
+  FEATURE_STORE_MODE: "offline"
+
   # S3 / Garage object store
   RAW_DATA_PATH: "s3://datasets/diabetes.csv"
   S3_ENDPOINT: "http://garage:3900"

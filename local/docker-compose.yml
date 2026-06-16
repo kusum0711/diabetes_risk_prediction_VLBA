@@ -127,7 +127,7 @@ services:
     # Apply (creates the sqlite online tables + S3 registry) then serve, so the
     # online store the server reads is the same one it materializes into.
     command: >
-      /bin/sh -c "mkdir -p /app/data &&
+      /bin/sh -c "mkdir -p /app/feature_repo/data &&
       feast -c feature_repo apply &&
       feast -c feature_repo serve -h 0.0.0.0 -p 6000"
     restart: unless-stopped
@@ -217,9 +217,50 @@ services:
       AWS_SECRET_ACCESS_KEY: minioadmin
     network_mode: host
 
+  # Prediction API: reads patient features from the feast parquet on the object
+  # store, loads the registered MLflow model, and serves predictions on :8000.
+  # Behind the `api` profile so a plain `up -d` doesn't start it. Requires the
+  # train pipeline to have registered a model and prepare to have written the
+  # parquet. Docs at http://localhost:8000/docs once running.
+  diabetes-api:
+    profiles: ["api"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+    environment:
+      MLFLOW_TRACKING_URI: http://localhost:5050
+      MODEL_NAME: ${MODEL_NAME:-diabetes_random_forest}
+      MODEL_VERSION: ${MODEL_VERSION:-latest}
+      # offline -> read parquet in-memory + local SDK materialize (no server).
+      # online  -> Feast REST server (FEAST_URL): get-online-features + materialize.
+      FEATURE_STORE_MODE: ${FEATURE_STORE_MODE:-offline}
+      FEAST_URL: ${FEAST_URL:-http://localhost:6000}
+      FEAST_SOURCE_PATH: s3://feast/diabetes_features.parquet
+      S3_ENDPOINT: http://localhost:3900
+      AWS_ENDPOINT_URL: http://localhost:3900
+      AWS_ENDPOINT_URL_S3: http://localhost:3900
+      AWS_REGION: garage
+      AWS_DEFAULT_REGION: garage
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    command: >
+      python -m src.main api
+    # Persist the Feast registry + sqlite online store across restarts so a
+    # materialized store survives container recreation.
+    volumes:
+      - feast-online-data:/app/feature_repo/data
+    network_mode: host
+    restart: unless-stopped
+
 volumes:
   garage-data:
   pg-data:
   mlflow-data:
   prometheus-data:
   grafana-data:
+  feast-online-data:

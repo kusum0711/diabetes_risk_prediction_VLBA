@@ -1,94 +1,89 @@
+"""Online-store materialization stage.
+
+Materializes features into the online store, verifies the store is readable,
+then runs a sample prediction to confirm the full pipeline end-to-end.
+"""
+
 import os
-import json
-from datetime import datetime
+import time
 
-import urllib.error
-import urllib.request
+import mlflow
 
-import pandas as pd
+from src.feast_utils import materialize, fetch_features, FEATURE_COLS
+from src.config import load_config
 
-from src.feast_utils import FEATURES
-
-
-# Feast feature server (REST). Endpoints are appended to FEAST_URL, so on the
-# cluster set FEAST_URL to include any mount prefix (the server spec mounts the
-# API under "/feast"); locally `feast serve` is at the root.
-FEAST_URL = os.environ.get("FEAST_URL", "http://localhost:6000")
-
-# Short feature column names (without the "diabetes_features:" view prefix).
-FEATURE_COLS = [f.split(":", 1)[1] for f in FEATURES]
+_SAMPLE_PATIENT_ID = 1
+_REGISTRY_REFRESH_TIMEOUT = 60
+_REGISTRY_POLL_INTERVAL = 10
 
 MODEL_NAME = os.environ.get("MODEL_NAME", "diabetes_random_forest")
-MODEL_STAGE = os.environ.get("MODEL_STAGE", "latest")
+MODEL_VERSION = os.environ.get("MODEL_VERSION", "latest")
 
 
-def _post(path, payload):
-    """POST JSON to the Feast feature server and return the parsed response."""
-    url = FEAST_URL.rstrip("/") + path
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        body = resp.read()
-    return json.loads(body) if body else {}
+def _load_model():
+    """Load the trained model from MLflow."""
+    config = load_config()
+    mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
+
+    if MODEL_VERSION and MODEL_VERSION.lower() != "latest":
+        uri = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
+    else:
+        client = mlflow.MlflowClient()
+        versions = client.search_model_versions(f"name='{MODEL_NAME}'")
+        if not versions:
+            raise RuntimeError(f"No registered versions found for model '{MODEL_NAME}'")
+        latest = max(versions, key=lambda v: int(v.version))
+        uri = f"models:/{MODEL_NAME}/{latest.version}"
+
+    try:
+        return mlflow.sklearn.load_model(uri)
+    except Exception:
+        return mlflow.xgboost.load_model(uri)
 
 
-def materialize_incremental():
-    """Materialize features into the online store via the Feast server."""
-    end_ts = datetime.utcnow().replace(microsecond=0).isoformat()
-    print(f"  POST {FEAST_URL}/materialize-incremental (end_ts={end_ts})")
-    _post("/materialize-incremental", {"end_ts": end_ts})
-    print("  Online store materialized (via Feast server)")
+def run_online_infer():
+    """Materialize the online store, verify features, then run a sample prediction."""
 
+    print("\nDIABETES RISK PREDICTION — MATERIALIZE ONLINE STORE")
 
-def get_online_features(patient_ids):
-    """Fetch online features for patient ids via the Feast server REST API."""
-    payload = {
-        "entities": {"patient_id": [int(pid) for pid in patient_ids]},
-        "features": FEATURES,
-        "full_feature_names": False,
-    }
-    resp = _post("/get-online-features", payload)
+    materialize()
 
-    # Response: metadata.feature_names aligned with results[i].values.
-    feature_names = resp["metadata"]["feature_names"]
-    results = resp["results"]
-    columns = {
-        feature_names[i]: results[i]["values"]
-        for i in range(len(feature_names))
-    }
-    return pd.DataFrame(columns)
+    print(f"\n  Verifying online store for patient_id={_SAMPLE_PATIENT_ID} ...")
+    deadline = time.time() + _REGISTRY_REFRESH_TIMEOUT
+    features = None
+    while True:
+        try:
+            features = fetch_features([_SAMPLE_PATIENT_ID])
+            null_count = features[FEATURE_COLS].isna().all(axis=1).sum()
+            if null_count > 0:
+                print(f"  WARNING: patient_id={_SAMPLE_PATIENT_ID} returned all-null features — was materialization successful?")
+            else:
+                print(f"  Online store returned {len(FEATURE_COLS)} feature(s) — OK.")
+            break
+        except Exception as exc:
+            if "404" in str(exc) and time.time() < deadline:
+                print(f"  Registry not yet refreshed ({exc}), retrying in {_REGISTRY_POLL_INTERVAL}s ...")
+                time.sleep(_REGISTRY_POLL_INTERVAL)
+            else:
+                print(f"  WARNING: feature fetch failed ({exc}).")
+                break
 
+    if features is not None and not features[FEATURE_COLS].isna().all(axis=1).any():
+        print(f"\n  Sample prediction for patient_id={_SAMPLE_PATIENT_ID} ...")
+        try:
+            config = load_config()
+            threshold = float(config.get("model", {}).get("class_1_threshold", 0.5))
+            model = _load_model()
+            X = features.loc[[_SAMPLE_PATIENT_ID], FEATURE_COLS].astype("float32")
+            proba = float(model.predict_proba(X)[:, 1][0])
+            label = "Diabetes/At risk" if proba >= threshold else "No diabetes"
+            print(f"  → {label} (probability={proba:.4f}, threshold={threshold})")
+        except Exception as exc:
+            print(f"  WARNING: sample prediction failed ({exc}).")
+    else:
+        print("\n  Skipping sample prediction — features unavailable.")
 
-def run_online_infer(patient_ids=None):
-    """Low-latency serving via the Feast server: materialize → fetch → predict."""
-
-    print("\n🚀 DIABETES RISK PREDICTION — ONLINE INFERENCE PIPELINE")
-
-    if patient_ids is None:
-        patient_ids = [1, 2, 3, 4, 5]
-
-    # ----------------------------------
-    # STEP 1: MATERIALIZE → ONLINE STORE (via Feast server)
-    # ----------------------------------
-    materialize_incremental()
-
-    # ----------------------------------
-    # STEP 2: FETCH ONLINE FEATURES (via Feast server)
-    # NOTE: /get-online-features is not accessible on the cluster's shared Feast
-    # server (project "mlpipeline"). Skipping until a project-scoped server is
-    # available.
-    # ----------------------------------
-    # features = get_online_features(patient_ids)
-    # print("\n  Online features:")
-    # print(features)
-
-    print("  Online feature retrieval skipped (HTTP route not accessible on cluster)")
-    return None
+    print("\n  Online store ready. Predictions are served by the prediction API.")
 
 
 if __name__ == "__main__":

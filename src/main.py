@@ -1,3 +1,4 @@
+import os
 import sys
 
 import pandas as pd
@@ -15,6 +16,7 @@ from src.feast_utils import (
     create_feast_data,
     apply_feast,
     get_training_data,
+    push_features,
 )
 
 from src.train import run_training
@@ -65,8 +67,13 @@ def run_prepare_data():
     # ----------------------------------
     apply_feast()
 
+    # # ----------------------------------
+    # # STEP 7: PUSH TO ONLINE STORE
+    # # ----------------------------------
+    # push_features()
+
     # ----------------------------------
-    # STEP 7: GET TRAINING DATA
+    # STEP 8: GET TRAINING DATA
     # ----------------------------------
     training_df = get_training_data()
 
@@ -107,6 +114,21 @@ def run_pipeline():
     return run_train()
 
 
+def run_api():
+    """Serve the prediction API (FastAPI via uvicorn).
+
+    Host/port come from API_HOST / API_PORT (default 0.0.0.0:8000). Imported
+    lazily so the other stages don't require uvicorn/fastapi.
+    """
+    import uvicorn
+
+    host = os.environ.get("API_HOST", "0.0.0.0")
+    port = int(os.environ.get("API_PORT", "8000"))
+
+    print(f"\n🚀 DIABETES RISK PREDICTION — API on {host}:{port}")
+    uvicorn.run("src.api:app", host=host, port=port)
+
+
 if __name__ == "__main__":
 
     stage = sys.argv[1] if len(sys.argv) > 1 else "all"
@@ -117,5 +139,9 @@ if __name__ == "__main__":
         run_train()
     elif stage in ("online", "online-infer", "infer"):
         run_online_infer()
+    elif stage in ("api", "serve"):
+        run_api()
+    elif stage == "push":
+        push_features()
     else:
         run_pipeline()
