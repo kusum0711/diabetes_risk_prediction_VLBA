@@ -2,16 +2,16 @@
 # Activated by copying this over feature_store.yaml when S3 env vars are present
 # (see src/feast_utils.configure_feast). Values use Feast ${ENV} interpolation,
 # so the SAME file works locally (MinIO/garage) and on the university cluster.
+# project: mlpipeline
 project: diabetes_risk_prediction
 provider: local
 
-# Local registry (kept per-container so apply/materialize/serve stay consistent
-# with the local sqlite online store). Relative path → resolved under
-# feature_repo/, so it works the same on the host, in CI, and in the server
-# container. The shared artifact is the feature DATA (offline parquet on S3),
-# not the registry. On the cluster, switch to the shared S3 registry + Postgres
-# online store (so all replicas share infra state).
-registry: data/registry.db
+# S3 registry: shared across all CI jobs and containers so apply in prepare-data
+# is visible to materialize in online-infer. Feast uses boto3 internally, which
+# picks up AWS_ENDPOINT_URL automatically (MinIO locally / Garage on cluster).
+registry:
+  path: s3://feast/registry/registry.db
+  registry_ttl_sec: 30
 
 offline_store:
   type: file

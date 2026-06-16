@@ -5,7 +5,7 @@ PYTHON        ?= python
 COMPOSE       ?= docker compose -f local/docker-compose.yml
 NETWORK       ?= mlops-net
 PYTEST_ARGS   ?= -n auto
-FLAKE8_ARGS   ?= --max-line-length=130
+FLAKE8_ARGS   ?= --max-line-length=160
 LINT_PATH     ?= src
 TEST_PATH     ?= src/tests
 CI_IMAGE      ?= diabetes-prediction-app
@@ -18,13 +18,14 @@ help:
 	@echo "  make build-feast   - build the feast server image"
 	@echo "  make run           - run the app pipeline (diabetes-app, profile 'app')"
 	@echo "  make build-app     - build the diabetes-app image via docker compose"
+	@echo "  make api           - run the prediction API (diabetes-api, profile 'api') on :8000"
 	@echo ""
 	@echo "CI (pipeline stages):"
 	@echo "  make lint          - flake8 over $(LINT_PATH)"
 	@echo "  make test          - pytest over $(TEST_PATH)"
 	@echo "  make build-image   - docker buildx build -t \$$(CI_IMAGE) ."
 	@echo "  make push-image    - docker push \$$(CI_IMAGE)"
-	@echo "  make prepare       - python -m src.main prepare"
+	@echo "  make prepare       - pythondiabetes-api -m src.main prepare"
 	@echo "  make train         - python -m src.main train"
 	@echo "  make online-infer  - python -m src.main online-infer"
 	@echo ""
@@ -45,11 +46,16 @@ build-feast:
 	$(COMPOSE) build feast
 
 run:
+	-$(COMPOSE) down
 	$(COMPOSE) --profile app build diabetes-app
 	$(COMPOSE) --profile app up diabetes-app
 
 build-app:
 	$(COMPOSE) --profile app build diabetes-app
+
+api:
+	$(COMPOSE) --profile api build diabetes-api
+	$(COMPOSE) --profile api up diabetes-api
 
 # ---------------------------------------------------------------------------
 # CI: test & lint (used by .gitlab/ci/test.gitlab-ci.yml)

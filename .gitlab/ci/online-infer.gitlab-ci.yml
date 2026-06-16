@@ -5,8 +5,8 @@ online-infer:
     - build-images
     - train
   script:
-    - echo "Running online inference pipeline..."
-    # Materializes features into the Postgres online store, then fetches online
-    # features and predicts using the model from the MLflow registry.
+    - echo "Materializing features into the online store..."
+    # Materializes features into the online store (via the Feast server in
+    # online mode). Predictions are served separately by the prediction API.
     - make online-infer
-    - echo "Online inference completed."
+    - echo "Online store materialization completed."
