@@ -7,7 +7,7 @@ model:
   target_column: Diabetes_012
   test_size: 0.2
   random_state: 42
-  cv_folds: 5
+  cv_folds: 3
   use_smote: true
   random_search_n_iter: 20
   class_1_threshold: 0.40
