@@ -40,7 +40,9 @@ from src.evaluate import (
 )
 
 from src.metrics import push_metrics
-# from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 
 # MLflow is enabled automatically when a tracking server is configured via the
@@ -74,6 +76,9 @@ if not MLFLOW_ENABLED:
             return None
 
         def log_artifact(self, *a, **k):
+            return None
+
+        def register_model(self, *a, **k):
             return None
 
         def start_run(self, *a, **k):
@@ -227,30 +232,30 @@ def get_models(config):
     cfg = config["models"]
     random_state = config["model"]["random_state"]
 
-    # if cfg["logistic_regression"]["enabled"]:
-    #     models["logistic_regression"] = {
-    #         "model": LogisticRegression(random_state=random_state, class_weight="balanced"),
-    #         "param_grid": cfg["logistic_regression"]["param_grid"],
-    #     }
+    if cfg["logistic_regression"]["enabled"]:
+        models["logistic_regression"] = {
+            "model": LogisticRegression(random_state=random_state, class_weight="balanced"),
+            "param_grid": cfg["logistic_regression"]["param_grid"],
+        }
 
-    # if cfg["random_forest"]["enabled"]:
-    #     models["random_forest"] = {
-    #         "model": RandomForestClassifier(
-    #             random_state=random_state,
-    #             class_weight=cfg["random_forest"].get(
-    #                 "class_weight",
-    #                 "balanced_subsample",
-    #             ),
-    #             n_jobs=1,
-    #         ),
-    #         "param_grid": cfg["random_forest"]["param_grid"],
-    #     }
+    if cfg["random_forest"]["enabled"]:
+        models["random_forest"] = {
+            "model": RandomForestClassifier(
+                random_state=random_state,
+                class_weight=cfg["random_forest"].get(
+                    "class_weight",
+                    "balanced_subsample",
+                ),
+                n_jobs=1,
+            ),
+            "param_grid": cfg["random_forest"]["param_grid"],
+        }
 
-    # if cfg["decision_tree"]["enabled"]:
-    #     models["decision_tree"] = {
-    #         "model": DecisionTreeClassifier(random_state=random_state, class_weight="balanced"),
-    #         "param_grid": cfg["decision_tree"]["param_grid"],
-    #     }
+    if cfg["decision_tree"]["enabled"]:
+        models["decision_tree"] = {
+            "model": DecisionTreeClassifier(random_state=random_state, class_weight="balanced"),
+            "param_grid": cfg["decision_tree"]["param_grid"],
+        }
 
     if cfg["xgboost"]["enabled"]:
         models["xgboost"] = {
@@ -476,10 +481,9 @@ def train_model(
         if y_probs.shape[1] == 2:
             pos_scores = y_probs[:, 1]
             config_threshold = config.get("model", {}).get("class_1_threshold", None)
-            if config_threshold is not None:
+            if name == "random_forest" and config_threshold is not None:
                 try:
                     best_threshold = float(config_threshold)
-                    # print(f"  Using configured class 1 threshold: {best_threshold:.2f}")
                 except Exception:
                     print("  Invalid class_1_threshold in config; falling back to tuning.")
                     best_threshold = tune_binary_threshold(y_true=y_test, y_score=pos_scores)
@@ -638,24 +642,19 @@ def train_model(
         mlflow.log_artifact(str(report_path))
         print(f"  📄 Model report saved: {report_path}")
 
-        #  Register Model
-        if name == "xgboost":
-            mlflow.xgboost.log_model(
-                best_model,
-                artifact_path=name,
-                registered_model_name=f"diabetes_{name}",
-            )
-        else:
-            mlflow.sklearn.log_model(
-                best_model,
-                artifact_path=name,
-                registered_model_name=f"diabetes_{name}",
-            )
+        #  Log Model (registration deferred to run_training — only best model is registered)
+        run_id = mlflow.active_run().info.run_id if MLFLOW_ENABLED else None
 
-        print(f"    {name} logged and registered in MLflow.")
+        if name == "xgboost":
+            mlflow.xgboost.log_model(best_model, artifact_path=name)
+        else:
+            mlflow.sklearn.log_model(best_model, artifact_path=name)
+
+        print(f"    {name} logged to MLflow.")
 
         return {
             "model_name": name,
+            "run_id": run_id,
             "best_model": best_model,
             "best_params": best_params,
             "train_metrics": train_metrics,
@@ -747,36 +746,38 @@ def run_training(df, config):
         hypothesis_df.to_csv(hypothesis_path, index=False)
         print(f"📄 Hypothesis report saved: {hypothesis_path}")
 
-    # ── Push best-model metrics to Pushgateway (→ Grafana) ──
+    # ── Register best model in MLflow ──
     if results:
         best = max(
             results,
             key=lambda r: r["test_metrics"]["test_recall_class_1"],
         )
-        tm = best["test_metrics"]
+        if MLFLOW_ENABLED and best.get("run_id"):
+            mlflow.register_model(
+                f"runs:/{best['run_id']}/{best['model_name']}",
+                f"diabetes_{best['model_name']}",
+            )
+            print(f"\n  Best model '{best['model_name']}' (recall_class_1={best['test_metrics']['test_recall_class_1']:.4f}) registered in MLflow.")
+
+    # ── Push all model metrics to Pushgateway (→ Grafana) ──
+    for result in results:
+        tm = result["test_metrics"]
         push_metrics(
             job="diabetes_train",
             metrics={
-                # Overall
                 "best_test_accuracy": tm["test_accuracy"],
                 "best_test_auc_roc": tm["test_auc_roc"],
-
-                # Macro recall
                 "best_test_recall_macro": tm["test_recall_macro"],
-
-                # Class 0 — Non-Diabetes
                 "best_test_precision_class_0": tm["test_precision_class_0"],
                 "best_test_recall_class_0": tm["test_recall_class_0"],
                 "best_test_f1_class_0": tm["test_f1_class_0"],
                 "best_test_auc_roc_class_0": tm["test_auc_roc"],
-
-                # Class 1 — Diabetes
                 "best_test_precision_class_1": tm["test_precision_class_1"],
                 "best_test_recall_class_1": tm["test_recall_class_1"],
                 "best_test_f1_class_1": tm["test_f1_class_1"],
                 "best_test_auc_roc_class_1": tm["test_auc_roc"],
             },
-            grouping={"model": best["model_name"]},
+            grouping={"model": result["model_name"]},
         )
 
     print("\n  All models trained, evaluated, and logged to MLflow.")
