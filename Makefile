@@ -19,6 +19,7 @@ help:
 	@echo "  make run           - run the app pipeline (diabetes-app, profile 'app')"
 	@echo "  make build-app     - build the diabetes-app image via docker compose"
 	@echo "  make api           - run the prediction API (diabetes-api, profile 'api') on :8000"
+	@echo "  make infer         - run the online-infer stage (diabetes-online-infer, profile 'infer')"
 	@echo ""
 	@echo "CI (pipeline stages):"
 	@echo "  make lint          - flake8 over $(LINT_PATH)"
@@ -37,16 +38,17 @@ help:
 # Local: docker compose (see docker-compose.yml for service details)
 # ---------------------------------------------------------------------------
 up:
+	$(COMPOSE) down --volumes --remove-orphans
 	$(COMPOSE) up -d
 
 down:
-	$(COMPOSE) down
+	$(COMPOSE) down --volumes --remove-orphans
 
 build-feast:
 	$(COMPOSE) build feast
 
 run:
-	-$(COMPOSE) down
+	-$(COMPOSE) down --volumes --remove-orphans
 	$(COMPOSE) --profile app build diabetes-app
 	$(COMPOSE) --profile app up diabetes-app
 
@@ -56,6 +58,10 @@ build-app:
 api:
 	$(COMPOSE) --profile api build diabetes-api
 	$(COMPOSE) --profile api up diabetes-api
+
+infer:
+	$(COMPOSE) --profile infer build diabetes-online-infer
+	$(COMPOSE) --profile infer up diabetes-online-infer
 
 # ---------------------------------------------------------------------------
 # CI: test & lint (used by .gitlab/ci/test.gitlab-ci.yml)

@@ -215,6 +215,43 @@ services:
       AWS_DEFAULT_REGION: garage
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
+      FEATURE_STORE_MODE: ${FEATURE_STORE_MODE:-offline}
+    network_mode: host
+
+  # Online-infer stage: mirrors the CI online-infer job. Materializes Feast
+  # features into the SQLite online store and verifies end-to-end prediction.
+  # Run after `make run` (prepare+train) has completed.
+  # The feast-online-data volume is shared with diabetes-api so the materialized
+  # store written here is immediately visible to the prediction API.
+  diabetes-online-infer:
+    profiles: ["infer"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      pushgateway:
+        condition: service_started
+    environment:
+      MODEL_NAME: ${MODEL_NAME:-diabetes_xgboost}
+      MLFLOW_TRACKING_URI: http://localhost:5050
+      FEAST_URL: http://localhost:6000
+      PUSHGATEWAY_URL: http://localhost:9091
+      RAW_DATA_PATH: s3://datasets/diabetes.csv
+      S3_ENDPOINT: http://localhost:3900
+      AWS_ENDPOINT_URL: http://localhost:3900
+      AWS_ENDPOINT_URL_S3: http://localhost:3900
+      AWS_REGION: garage
+      AWS_DEFAULT_REGION: garage
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      FEATURE_STORE_MODE: ${FEATURE_STORE_MODE:-offline}
+    command: python -m src.main online-infer
+    volumes:
+      - feast-online-data:/app/feature_repo/data
     network_mode: host
 
   # Prediction API: reads patient features from the feast parquet on the object
@@ -234,7 +271,7 @@ services:
         condition: service_healthy
     environment:
       MLFLOW_TRACKING_URI: http://localhost:5050
-      MODEL_NAME: ${MODEL_NAME:-diabetes_random_forest}
+      MODEL_NAME: ${MODEL_NAME:-diabetes_xgboost}
       MODEL_VERSION: ${MODEL_VERSION:-latest}
       # offline -> read parquet in-memory + local SDK materialize (no server).
       # online  -> Feast REST server (FEAST_URL): get-online-features + materialize.
