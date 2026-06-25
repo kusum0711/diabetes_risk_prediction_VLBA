@@ -7,7 +7,7 @@ model:
   target_column: Diabetes_012
   test_size: 0.2
   random_state: 42
-  cv_folds: 3
+  cv_folds: 5
   use_smote: true
   random_search_n_iter: 20
   class_1_threshold: 0.40
@@ -18,7 +18,7 @@ mlflow:
 
 models:
   logistic_regression:
-    enabled: false
+    enabled: true
     param_grid:
       C: [0.01, 0.1, 1]
       max_iter: [500]
@@ -41,14 +41,14 @@ models:
       colsample_bytree: [0.8]
 
   decision_tree:
-    enabled: false
+    enabled: true
     param_grid:
       max_depth: [5, 10]
       min_samples_split: [5]
       min_samples_leaf: [2]
 
   random_forest:
-    enabled: false
+    enabled: true
     class_weight: balanced_subsample
     param_grid:
       n_estimators: [500]

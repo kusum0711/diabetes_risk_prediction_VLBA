@@ -20,7 +20,7 @@ PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "").strip()
 
 # Feast
 FEAST_URL = os.environ.get("FEAST_URL", "http://localhost:6000")
-FEATURE_STORE_MODE = os.environ.get("FEATURE_STORE_MODE", "online").lower()
+FEATURE_STORE_MODE = os.environ.get("FEATURE_STORE_MODE", "rest-api").lower()
 
 # AWS / S3 (used by feast_utils and preprocess for custom S3-compatible endpoints)
 AWS_ENDPOINT_URL = os.environ.get("AWS_ENDPOINT_URL")

@@ -232,23 +232,23 @@ def get_training_data(
 
 
 # ---------------------------------------------------
-# FEATURE STORE MODE (online via Feast REST server vs offline local access)
+# FEATURE STORE MODE (rest-api via Feast REST server vs sdk local access)
 # ---------------------------------------------------
 # FEATURE_STORE_MODE selects how features are read and how the online store is
 # materialized:
-#   online  -> Feast REST server (FEAST_URL): /get-online-features for reads,
-#              /materialize-incremental for materialization.
-#   offline -> read the feature parquet directly (in-memory), and materialize
-#              into the local online store via the embedded Feast SDK.
+#   rest-api -> Feast REST server (FEAST_URL): /get-online-features for reads,
+#               /materialize-incremental for materialization.
+#   sdk      -> read the feature parquet directly (in-memory), and materialize
+#               into the local online store via the embedded Feast SDK.
 
 FEATURE_COLS = [f.split(":", 1)[1] for f in FEATURES]
 
 
 def feature_store_mode():
-    """Return the active feature store mode: 'online' or 'offline' (default).
+    """Return the active feature store mode: 'rest-api' or 'sdk' (default).
 
-    online  -> use the Feast online store via the REST server (FEAST_URL).
-    offline -> read the offline feature parquet directly.
+    rest-api -> use the Feast online store via the REST server (FEAST_URL).
+    sdk      -> read the feature parquet directly via the embedded Feast SDK.
     """
     return FEATURE_STORE_MODE
 
@@ -386,7 +386,7 @@ def get_online_features_rest(patient_ids):
 
 
 # ---------------------------------------------------
-# ONLINE STORE via embedded SDK (used to materialize in OFFLINE mode)
+# ONLINE STORE via embedded SDK (used to materialize in sdk mode)
 # ---------------------------------------------------
 
 def get_feature_store(repo_path="feature_repo", apply=False):
@@ -448,7 +448,7 @@ def materialize_online_store(repo_path="feature_repo", end=None):
 def materialize(mode=None):
     """Materialize the online store using the method for the running mode."""
     mode = mode or feature_store_mode()
-    if mode == "online":
+    if mode == "rest-api":
         materialize_incremental()          # REST → Feast server's online store
     else:
         materialize_online_store()         # SDK → local online store
@@ -457,11 +457,11 @@ def materialize(mode=None):
 def push_features(mode=None):
     """Push feature rows directly to the online store for the running mode.
 
-    online  -> /write-to-online-store REST endpoint
-    offline -> SDK materialize_incremental (local sqlite)
+    rest-api -> /write-to-online-store REST endpoint
+    sdk      -> SDK materialize_incremental (local sqlite)
     """
     mode = mode or feature_store_mode()
-    if mode == "online":
+    if mode == "rest-api":
         push_to_online_store_rest()
     else:
         materialize_online_store()
@@ -470,10 +470,10 @@ def push_features(mode=None):
 def fetch_features(patient_ids, mode=None):
     """Return a patient_id-indexed feature frame for the running mode.
 
-    online  -> Feast REST /get-online-features
-    offline -> Feast SDK get_online_features (reads from configured online store)
+    rest-api -> Feast REST /get-online-features
+    sdk      -> Feast SDK get_online_features (reads from configured online store)
     """
     mode = mode or feature_store_mode()
-    if mode == "online":
+    if mode == "rest-api":
         return get_online_features_rest(patient_ids).set_index("patient_id")
     return get_online_features_sdk(patient_ids)

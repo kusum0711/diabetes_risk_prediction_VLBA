@@ -28,8 +28,8 @@ x-diabetes-env: &diabetes-env
   MLFLOW_TRACKING_URI: http://localhost:5050
   FEAST_URL: ${FEAST_URL:-http://localhost:6000}
   FEAST_SOURCE_PATH: s3://feast/diabetes_features.parquet
-  FEATURE_STORE_MODE: ${FEATURE_STORE_MODE:-offline}
-  MODEL_NAME: ${MODEL_NAME:-diabetes_xgboost}
+  FEATURE_STORE_MODE: ${FEATURE_STORE_MODE:-sdk}
+  MODEL_NAME: ${MODEL_NAME:-diabetes_random_forest}
   RAW_DATA_PATH: s3://datasets/diabetes.csv
   PUSHGATEWAY_URL: http://localhost:9091
 
