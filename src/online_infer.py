@@ -4,41 +4,18 @@ Materializes features into the online store, verifies the store is readable,
 then runs a sample prediction to confirm the full pipeline end-to-end.
 """
 
-import os
 import time
 
 import mlflow
 
 from src.feast_utils import materialize, fetch_features, FEATURE_COLS
 from src.config import load_config
+from src.store import load_registered_model
+from src.env import MODEL_NAME, MODEL_VERSION
 
 _SAMPLE_PATIENT_ID = 1
 _REGISTRY_REFRESH_TIMEOUT = 60
 _REGISTRY_POLL_INTERVAL = 10
-
-MODEL_NAME = os.environ.get("MODEL_NAME", "diabetes_random_forest")
-MODEL_VERSION = os.environ.get("MODEL_VERSION", "latest")
-
-
-def _load_model():
-    """Load the trained model from MLflow."""
-    config = load_config()
-    mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
-
-    if MODEL_VERSION and MODEL_VERSION.lower() != "latest":
-        uri = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
-    else:
-        client = mlflow.MlflowClient()
-        versions = client.search_model_versions(f"name='{MODEL_NAME}'")
-        if not versions:
-            raise RuntimeError(f"No registered versions found for model '{MODEL_NAME}'")
-        latest = max(versions, key=lambda v: int(v.version))
-        uri = f"models:/{MODEL_NAME}/{latest.version}"
-
-    try:
-        return mlflow.sklearn.load_model(uri)
-    except Exception:
-        return mlflow.xgboost.load_model(uri)
 
 
 def run_online_infer():
@@ -72,8 +49,9 @@ def run_online_infer():
         print(f"\n  Sample prediction for patient_id={_SAMPLE_PATIENT_ID} ...")
         try:
             config = load_config()
+            mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
             threshold = float(config.get("model", {}).get("class_1_threshold", 0.5))
-            model = _load_model()
+            model, _ = load_registered_model(MODEL_NAME, MODEL_VERSION)
             X = features.loc[[_SAMPLE_PATIENT_ID], FEATURE_COLS].astype("float32")
             proba = float(model.predict_proba(X)[:, 1][0])
             label = "Diabetes/At risk" if proba >= threshold else "No diabetes"

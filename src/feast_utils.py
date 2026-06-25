@@ -9,6 +9,15 @@ from datetime import datetime
 
 from feast import FeatureStore
 
+from src.env import (
+    AWS_ENDPOINT_URL,
+    S3_ENDPOINT,
+    AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY,
+    FEAST_URL,
+    FEATURE_STORE_MODE,
+)
+
 
 FEATURE_SERVICE_NAME = "diabetes_feature_service"
 
@@ -34,7 +43,6 @@ FEATURES = [
     "diabetes_features:Income",
     "diabetes_features:age_metabolic_risk",
     "diabetes_features:HealthRiskScore",
-    # "diabetes_features:metabolic_risk",
 ]
 
 # Where feature data lives when running against S3/Garage (server profile).
@@ -46,7 +54,7 @@ FEAST_SOURCE_S3 = "s3://feast/diabetes_features.parquet"
 # ---------------------------------------------------
 
 def _s3_endpoint():
-    return os.environ.get("AWS_ENDPOINT_URL") or os.environ.get("S3_ENDPOINT")
+    return AWS_ENDPOINT_URL or S3_ENDPOINT
 
 
 def _use_s3():
@@ -57,8 +65,8 @@ def _use_s3():
 def _s3_storage_options():
     """storage_options for pandas/s3fs against a custom S3 endpoint (MinIO/Garage)."""
     return {
-        "key": os.environ.get("AWS_ACCESS_KEY_ID"),
-        "secret": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        "key": AWS_ACCESS_KEY_ID,
+        "secret": AWS_SECRET_ACCESS_KEY,
         "client_kwargs": {"endpoint_url": _s3_endpoint()},
     }
 
@@ -235,19 +243,13 @@ def get_training_data(
 
 FEATURE_COLS = [f.split(":", 1)[1] for f in FEATURES]
 
-# Feast feature server (REST). Endpoints are appended to FEAST_URL, so on the
-# cluster set FEAST_URL to include any mount prefix; locally `feast serve` is at
-# the root (http://localhost:6000).
-FEAST_URL = os.environ.get("FEAST_URL", "http://localhost:6000")
-
-
 def feature_store_mode():
     """Return the active feature store mode: 'online' or 'offline' (default).
 
     online  -> use the Feast online store via the REST server (FEAST_URL).
     offline -> read the offline feature parquet directly.
     """
-    return os.environ.get("FEATURE_STORE_MODE", "online").lower()
+    return FEATURE_STORE_MODE
 
 
 # ---------------------------------------------------

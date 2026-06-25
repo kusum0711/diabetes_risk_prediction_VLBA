@@ -189,19 +189,6 @@ class TestSmote:
         assert list(X_res.columns) == list(X_train.columns)
 
 
-# # Scaling
-
-# class TestScaling:
-
-#     def test_scaled_mean_near_zero(self, processed_data):
-
-#         X_train, _, _, _ = processed_data
-
-#         means = X_train.mean()
-
-#         assert (means.abs() < 0.1).all()
-
-
 # Metrics
 
 class TestMetrics:
@@ -275,10 +262,10 @@ class TestModels:
 
         models = get_models(sample_config)
 
-        # assert "logistic_regression" in models
-        # assert "random_forest" in models
+        assert "logistic_regression" in models
+        assert "random_forest" in models
         assert "xgboost" not in models
-        # assert "decision_tree" in models
+        assert "decision_tree" in models
 
 
 # Integration

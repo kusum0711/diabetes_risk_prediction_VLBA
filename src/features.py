@@ -1,7 +1,4 @@
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
-
-scaler = MinMaxScaler()
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:

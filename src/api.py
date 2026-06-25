@@ -15,8 +15,6 @@ Run locally (inside the app image, which has the deps):
     python -m src.main api      # or: uvicorn src.api:app --host 0.0.0.0 --port 8000
 """
 
-import os
-
 import mlflow
 
 from fastapi import FastAPI, HTTPException
@@ -30,13 +28,10 @@ from src.feast_utils import (
     materialize as feast_materialize,
 )
 from src.config import load_config
+from src.store import load_registered_model
+from src.env import MODEL_NAME, MODEL_VERSION
 
 TARGET_COLUMN = "Diabetes_012"
-
-# Which registered model to serve. MODEL_VERSION may be a version number
-# ("2") or the literal "latest" to resolve the highest registered version.
-MODEL_NAME = os.environ.get("MODEL_NAME", "diabetes_random_forest")
-MODEL_VERSION = os.environ.get("MODEL_VERSION", "latest")
 
 
 # ---------------------------------------------------------------------------
@@ -50,33 +45,6 @@ class _State:
 
 
 _state = _State()
-
-
-def _resolve_model_uri():
-    """Return (uri, version) for the model to load."""
-    if MODEL_VERSION and MODEL_VERSION.lower() != "latest":
-        return f"models:/{MODEL_NAME}/{MODEL_VERSION}", MODEL_VERSION
-
-    client = mlflow.MlflowClient()
-    versions = client.search_model_versions(f"name='{MODEL_NAME}'")
-    if not versions:
-        raise RuntimeError(f"No registered versions found for model '{MODEL_NAME}'")
-    latest = max(versions, key=lambda v: int(v.version))
-    return f"models:/{MODEL_NAME}/{latest.version}", latest.version
-
-
-def _load_model_obj(uri):
-    """Load the registered model with predict_proba support.
-
-    XGBoost models are logged via the xgboost flavor; everything else via the
-    sklearn flavor. Both flavors restore an estimator exposing predict_proba.
-    """
-    if "xgboost" in MODEL_NAME.lower():
-        return mlflow.xgboost.load_model(uri)
-    try:
-        return mlflow.sklearn.load_model(uri)
-    except Exception:
-        return mlflow.xgboost.load_model(uri)
 
 
 def _ensure_offline_features():
@@ -94,9 +62,7 @@ def _ensure_model():
         _state.threshold = float(
             config.get("model", {}).get("class_1_threshold", 0.5)
         )
-        uri, version = _resolve_model_uri()
-        _state.model = _load_model_obj(uri)
-        _state.model_version = version
+        _state.model, _state.model_version = load_registered_model(MODEL_NAME, MODEL_VERSION)
 
 
 def _fetch_features(patient_ids):

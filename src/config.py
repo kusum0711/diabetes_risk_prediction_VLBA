@@ -1,6 +1,6 @@
-import os
 import yaml
 from pathlib import Path
+from src.env import MLFLOW_TRACKING_URI
 
 
 def load_config(config_path: str = "configs/config.yaml") -> dict:
@@ -28,13 +28,9 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
             if key in config["data"]:
                 config["data"][key] = resolve_data_path(config["data"][key])
 
-    # Override MLflow tracking URI from environment variable if set
-    # This allows Docker to use http://mlflow:5000
-    # while local uses http://localhost:5000
-    env_uri = os.environ.get("MLFLOW_TRACKING_URI")
-    if env_uri:
-        config["mlflow"]["tracking_uri"] = env_uri
-        print(f"  MLflow URI overridden from environment: {env_uri}")
+    if MLFLOW_TRACKING_URI:
+        config["mlflow"]["tracking_uri"] = MLFLOW_TRACKING_URI
+        print(f"  MLflow URI overridden from environment: {MLFLOW_TRACKING_URI}")
 
     print(f"  Config loaded from: {path}")
     return config

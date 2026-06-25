@@ -69,8 +69,6 @@ def compute_metrics(model, X, y, prefix=""):
     return metrics, y_pred
 
 
-# Overfitting Detection
-
 def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
 
     train_acc = train_metrics["train_accuracy"]
@@ -99,7 +97,6 @@ def detect_overfitting(train_metrics, test_metrics, threshold=0.1):
     return acc_gap, is_overfitting
 
 
-# Confusion Matrix
 def save_confusion_matrix(cm, model_name, reports_dir):
     fig, ax = plt.subplots(figsize=(8, 6))
     # Choose labels based on confusion matrix shape
@@ -122,48 +119,3 @@ def save_confusion_matrix(cm, model_name, reports_dir):
     plt.close()
     print(f"    Confusion matrix saved: {path}")
     return path
-
-
-# Hypothesis Evaluation
-
-HYPOTHESES = {
-    "H1_BMI_increases_diabetes_risk": [
-        "BMI",
-        "BMI_cat_Obese",
-        "BMI_cat_Overweight",
-        "BMI_cat_Underweight",
-    ],
-    "H2_poor_health_correlates_diabetes": [
-        "GenHlth",
-        "Total_Unhealthy_Days",
-    ],
-    "H3_older_age_increases_diabetes_risk": [
-        "Age",
-        "Age_cat_Old",
-        "Age_cat_Young",
-    ],
-}
-
-
-def evaluate_hypotheses(model_name, feature_names, importances):
-    results = []
-    fi_dict = dict(zip(feature_names, importances))
-    sorted_importances = sorted(importances, reverse=True)
-    total_features = len(feature_names)
-
-    for hypothesis, features in HYPOTHESES.items():
-        for feature in features:
-            if feature in fi_dict:
-                importance = fi_dict[feature]
-                rank = sorted_importances.index(importance) + 1
-                results.append({
-                    "model": model_name,
-                    "hypothesis": hypothesis,
-                    "feature": feature,
-                    "importance": round(importance, 6),
-                    "rank": rank,
-                    "total_features": total_features,
-                    "supported": rank <= total_features // 2,
-                })
-
-    return results

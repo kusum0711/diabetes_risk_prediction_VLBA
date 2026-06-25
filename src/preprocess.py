@@ -1,8 +1,8 @@
-import os
 import pandas as pd
 from pathlib import Path
 from src.config import load_config
 from src.feast_utils import _s3_storage_options
+from src.env import RAW_DATA_PATH
 
 config = load_config()
 RAW_PATH = Path(config["data"]["raw_path"])
@@ -45,7 +45,7 @@ DOMAIN_MISSING_VALUES = {"BMI": 0}
 
 def load_data(path=None) -> pd.DataFrame:
     if path is None:
-        path = os.environ.get("RAW_DATA_PATH") or str(RAW_PATH)
+        path = RAW_DATA_PATH or str(RAW_PATH)
 
     path_str = str(path)
 

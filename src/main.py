@@ -1,4 +1,3 @@
-import os
 import sys
 
 import pandas as pd
@@ -22,6 +21,7 @@ from src.feast_utils import (
 from src.train import run_training
 from src.online_infer import run_online_infer
 from src.config import load_config
+from src.env import API_HOST, API_PORT
 
 
 # Hand-off file produced by the prepare-data pipeline and consumed by the
@@ -33,48 +33,13 @@ def run_prepare_data():
 
     print("\n🚀 DIABETES RISK PREDICTION — PREPARE DATA PIPELINE")
 
-    # ----------------------------------
-    # STEP 1: LOAD DATA
-    # ----------------------------------
     df = load_data()
-
-    # ----------------------------------
-    # STEP 2: VALIDATE DATA
-    # ----------------------------------
-    df = validate_data(
-        df,
-        raise_error=False,
-    )
-
-    # ----------------------------------
-    # STEP 3: CLEAN DATA
-    # ----------------------------------
+    df = validate_data(df, raise_error=False)
     df = clean_data(df)
-
-    # ----------------------------------
-    # STEP 4: FEATURE ENGINEERING
-    # ----------------------------------
     df = engineer_features(df)
     save_data(df)
-
-    # ----------------------------------
-    # STEP 5: SAVE FEAST DATA
-    # ----------------------------------
     create_feast_data()
-
-    # ----------------------------------
-    # STEP 6: APPLY FEAST
-    # ----------------------------------
     apply_feast()
-
-    # # ----------------------------------
-    # # STEP 7: PUSH TO ONLINE STORE
-    # # ----------------------------------
-    # push_features()
-
-    # ----------------------------------
-    # STEP 8: GET TRAINING DATA
-    # ----------------------------------
     training_df = get_training_data()
 
     print("\n  PREPARE DATA PIPELINE COMPLETED")
@@ -87,20 +52,8 @@ def run_train():
     print("\n🚀 DIABETES RISK PREDICTION — TRAIN PIPELINE")
 
     config = load_config()
-
-    # ----------------------------------
-    # STEP 8: LOAD TRAINING DATA
-    # (produced by the prepare-data pipeline)
-    # ----------------------------------
     training_df = pd.read_csv(TRAINING_DATA_PATH)
-
-    # ----------------------------------
-    # STEP 9: TRAIN MODELS
-    # ----------------------------------
-    results = run_training(
-        training_df,
-        config,
-    )
+    results = run_training(training_df, config)
 
     print("\n  TRAIN PIPELINE COMPLETED")
 
@@ -122,8 +75,8 @@ def run_api():
     """
     import uvicorn
 
-    host = os.environ.get("API_HOST", "0.0.0.0")
-    port = int(os.environ.get("API_PORT", "8000"))
+    host = API_HOST
+    port = API_PORT
 
     print(f"\n🚀 DIABETES RISK PREDICTION — API on {host}:{port}")
     uvicorn.run("src.api:app", host=host, port=port)

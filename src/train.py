@@ -1,12 +1,8 @@
-import os
 import time
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
 import pandas as pd
-from sklearn.metrics import classification_report
-from sklearn.metrics import roc_auc_score
-
 import numpy as np
 
 from pathlib import Path
@@ -24,10 +20,15 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     f1_score,
+    roc_auc_score,
+    classification_report,
     confusion_matrix,
 )
 
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 from imblearn.over_sampling import SMOTE
 from xgboost import XGBClassifier
@@ -36,70 +37,8 @@ from src.evaluate import (
     compute_metrics,
     detect_overfitting,
     save_confusion_matrix,
-    evaluate_hypotheses,
 )
-
 from src.metrics import push_metrics
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-
-
-# MLflow is enabled automatically when a tracking server is configured via the
-# MLFLOW_TRACKING_URI env var (e.g. http://mlflow:5000 on the cluster). With no
-# server configured (local dev / tests) it falls back to a no-op stub so the
-# pipeline still runs offline. Set MLFLOW_FORCE_ENABLED=1 to override.
-MLFLOW_ENABLED = bool(os.environ.get("MLFLOW_TRACKING_URI")) or bool(
-    os.environ.get("MLFLOW_FORCE_ENABLED")
-)
-
-if not MLFLOW_ENABLED:
-    import contextlib
-
-    class _DummyMLflow:
-        def set_experiment(self, *a, **k):
-            return None
-
-        def set_tracking_uri(self, *a, **k):
-            return None
-
-        def log_params(self, *a, **k):
-            return None
-
-        def log_param(self, *a, **k):
-            return None
-
-        def log_metrics(self, *a, **k):
-            return None
-
-        def log_metric(self, *a, **k):
-            return None
-
-        def log_artifact(self, *a, **k):
-            return None
-
-        def register_model(self, *a, **k):
-            return None
-
-        def start_run(self, *a, **k):
-            @contextlib.contextmanager
-            def _cm(*args, **kwargs):
-                yield
-
-            return _cm()
-
-        class sklearn:
-            @staticmethod
-            def log_model(*a, **k):
-                return None
-
-        class xgboost:
-            @staticmethod
-            def log_model(*a, **k):
-                return None
-
-    # Override the mlflow module object in this namespace with a no-op stub
-    mlflow = _DummyMLflow()  # noqa: F811
 
 
 # Data Preparation
@@ -258,18 +197,9 @@ def get_models(config):
         }
 
     if cfg["xgboost"]["enabled"]:
+        base = cfg["xgboost"].get("base_params", {})
         models["xgboost"] = {
-            "model": XGBClassifier(
-                random_state=random_state,
-                eval_metric="logloss",
-                objective="binary:logistic",
-
-                tree_method="hist",
-                n_jobs=-1,
-
-                reg_alpha=0.1,
-                reg_lambda=1.0,
-            ),
+            "model": XGBClassifier(random_state=random_state, **base),
             "param_grid": cfg["xgboost"]["param_grid"],
         }
 
@@ -396,7 +326,6 @@ def apply_custom_thresholds(y_probs, thresholds):
 
         adjusted_scores = probs.copy()
 
-        # Apply threshold scaling
         for cls, threshold in thresholds.items():
 
             if probs[cls] >= threshold:
@@ -421,7 +350,6 @@ def train_model(
     config,
     baseline_metrics,
     reports_dir,
-    hypothesis_results,
 ):
     print(f"\n{'='*60}")
     print(f"  Training: {name}")
@@ -448,15 +376,8 @@ def train_model(
 
     with mlflow.start_run(run_name=name):
 
-        # ── Train ──
         start_time = time.time()
-        # grid_search.fit(X_train, y_train)
-
-        if name == "xgboost":
-            grid_search.fit(X_train, y_train)
-
-        else:
-            grid_search.fit(X_train, y_train)
+        grid_search.fit(X_train, y_train)
         training_time = time.time() - start_time
 
         best_model = grid_search.best_estimator_
@@ -465,15 +386,10 @@ def train_model(
         print(f"  Best Params: {best_params}")
         print(f"  Training Time: {training_time:.2f}s")
 
-        #  Metrics
         train_metrics, _ = compute_metrics(
             best_model, X_train, y_train, prefix="train_"
         )
-        # ─────────────────────────────────────────────
-        # Threshold Tuning
-        # ─────────────────────────────────────────────
 
-        # Predict probabilities
         y_probs = best_model.predict_proba(X_test)
 
         # If binary classification, allow using a configured threshold for the
@@ -505,62 +421,30 @@ def train_model(
                 best_thresholds,
             )
 
-        # Test ROC AUC
         if y_probs.shape[1] == 2:
-
-            test_auc_roc = roc_auc_score(
-                y_test,
-                y_probs[:, 1],
-            )
-
+            test_auc_roc = roc_auc_score(y_test, y_probs[:, 1])
         else:
+            test_auc_roc = roc_auc_score(y_test, y_probs, multi_class="ovr", average="weighted")
 
-            test_auc_roc = roc_auc_score(
-                y_test,
-                y_probs,
-                multi_class="ovr",
-                average="weighted",
-            )
-        # Per-class arrays for test set (using tuned-threshold y_pred)
         test_per_class_precision = precision_score(y_test, y_pred, average=None, zero_division=0)
         test_per_class_recall = recall_score(y_test, y_pred, average=None, zero_division=0)
         test_per_class_f1 = f1_score(y_test, y_pred, average=None, zero_division=0)
 
-        # Compute test metrics
         test_metrics = {
-            # Overall accuracy
             "test_accuracy": accuracy_score(y_test, y_pred),
-
-            # Weighted averages
-            "test_precision_weighted": precision_score(
-                y_test, y_pred, average="weighted", zero_division=0,
-            ),
-            "test_recall_weighted": recall_score(
-                y_test, y_pred, average="weighted", zero_division=0,
-            ),
-            "test_f1_weighted": f1_score(
-                y_test, y_pred, average="weighted", zero_division=0,
-            ),
-
-            # Macro recall
-            "test_recall_macro": recall_score(
-                y_test, y_pred, average="macro", zero_division=0,
-            ),
-
-            # ROC AUC
+            "test_precision_weighted": precision_score(y_test, y_pred, average="weighted", zero_division=0),
+            "test_recall_weighted": recall_score(y_test, y_pred, average="weighted", zero_division=0),
+            "test_f1_weighted": f1_score(y_test, y_pred, average="weighted", zero_division=0),
+            "test_recall_macro": recall_score(y_test, y_pred, average="macro", zero_division=0),
             "test_auc_roc": test_auc_roc,
-
-            # Per-class: class 0 = Non-Diabetes, class 1 = Diabetes
             "test_precision_class_0": float(test_per_class_precision[0]),
             "test_recall_class_0": float(test_per_class_recall[0]),
             "test_f1_class_0": float(test_per_class_f1[0]),
-
             "test_precision_class_1": float(test_per_class_precision[1]),
             "test_recall_class_1": float(test_per_class_recall[1]),
             "test_f1_class_1": float(test_per_class_f1[1]),
         }
 
-        # Human-readable target names
         if np.unique(y_test).size == 2:
             target_names = ['No Diabetes', 'Diabetes']
         else:
@@ -574,12 +458,8 @@ def train_model(
         print(f"\nClassification Report — {name}")
         print(report)
 
-        #  Overfitting
-        acc_gap, is_overfitting = detect_overfitting(
-            train_metrics, test_metrics
-        )
+        acc_gap, is_overfitting = detect_overfitting(train_metrics, test_metrics)
 
-        #  Confusion Matrix
         y_test_reset = pd.Series(y_test).reset_index(drop=True)
         cm = confusion_matrix(y_test_reset, y_pred)
         cm_path = save_confusion_matrix(cm, name, reports_dir)
@@ -592,20 +472,9 @@ def train_model(
         )
 
         if fi_output:
-
             fi_df, fi_path = fi_output
-
             mlflow.log_artifact(str(fi_path))
 
-            h_results = evaluate_hypotheses(
-                name,
-                fi_df["feature"].tolist(),
-                fi_df["importance"].tolist(),
-            )
-
-            hypothesis_results.extend(h_results)
-
-        #  Log to MLflow
         mlflow.log_params(best_params)
         for cls, threshold in best_thresholds.items():
             mlflow.log_param(
@@ -622,7 +491,6 @@ def train_model(
         mlflow.log_param("model_name", name)
         mlflow.log_artifact(str(cm_path))
 
-        #  Model Report
         model_report = {
             "model_name": name,
             "best_params": str(best_params),
@@ -643,7 +511,7 @@ def train_model(
         print(f"  📄 Model report saved: {report_path}")
 
         #  Log Model (registration deferred to run_training — only best model is registered)
-        run_id = mlflow.active_run().info.run_id if MLFLOW_ENABLED else None
+        run_id = mlflow.active_run().info.run_id
 
         if name == "xgboost":
             mlflow.xgboost.log_model(best_model, artifact_path=name)
@@ -667,7 +535,6 @@ def train_model(
         }
 
 
-#  Main Entry Point
 def run_training(df, config):
 
     mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
@@ -675,23 +542,16 @@ def run_training(df, config):
     reports_dir = Path("reports")
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    #  Load & Prepare ─
     X_train, X_test, y_train, y_test = prepare_data(df, config)
-
-    #  SMOTE
     X_train, y_train = apply_smote(X_train, y_train, config)
 
-    #  Scale
     # Scale copy only for linear models
     X_train_scaled, X_test_scaled, scaler = scale_features(X_train, X_test)
 
-    #  Baseline
     baseline_metrics = train_baseline(X_train, X_test, y_train, y_test, config)
 
-    #  Train All Models
     models = get_models(config)
     results = []
-    hypothesis_results = []
 
     for name, model_def in models.items():
 
@@ -713,18 +573,15 @@ def run_training(df, config):
             config=config,
             baseline_metrics=baseline_metrics,
             reports_dir=reports_dir,
-            hypothesis_results=hypothesis_results,
         )
 
         results.append(result)
 
-    #  Model Assessment Report
     assessment_df = pd.DataFrame([r["model_report"] for r in results])
     assessment_path = reports_dir / "model_assessment_report.csv"
     assessment_df.to_csv(assessment_path, index=False)
     print(f"\n📄 Model assessment report saved: {assessment_path}")
 
-    #  Overfitting Report
     overfitting_df = assessment_df[[
         "model_name",
         "train_accuracy",
@@ -739,20 +596,13 @@ def run_training(df, config):
     overfitting_df.to_csv(overfitting_path, index=False)
     print(f"📄 Overfitting report saved: {overfitting_path}")
 
-    #  Hypothesis Report
-    if hypothesis_results:
-        hypothesis_df = pd.DataFrame(hypothesis_results)
-        hypothesis_path = reports_dir / "hypothesis_report.csv"
-        hypothesis_df.to_csv(hypothesis_path, index=False)
-        print(f"📄 Hypothesis report saved: {hypothesis_path}")
-
     # ── Register best model in MLflow ──
     if results:
         best = max(
             results,
             key=lambda r: r["test_metrics"]["test_recall_class_1"],
         )
-        if MLFLOW_ENABLED and best.get("run_id"):
+        if best.get("run_id"):
             mlflow.register_model(
                 f"runs:/{best['run_id']}/{best['model_name']}",
                 f"diabetes_{best['model_name']}",

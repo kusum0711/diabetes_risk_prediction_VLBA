@@ -1,7 +1,7 @@
-import os
-
 import urllib.error
 import urllib.request
+
+from src.env import PUSHGATEWAY_URL
 
 
 def push_metrics(job, metrics, grouping=None):
@@ -12,7 +12,7 @@ def push_metrics(job, metrics, grouping=None):
     client dependency. `metrics` is a dict of {name: float}.
     """
 
-    base = os.environ.get("PUSHGATEWAY_URL", "").strip()
+    base = PUSHGATEWAY_URL
     if not base:
         print("  PUSHGATEWAY_URL not set — skipping metrics push")
         return
