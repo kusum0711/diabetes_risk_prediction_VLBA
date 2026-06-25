@@ -43,11 +43,10 @@ variables:
 
   # Feast Postgres online store — disabled for local; the server profile uses a
   # local sqlite online store instead (see feature_store.yaml.server).
-  # POSTGRES_FEAST_HOST: "postgres"
-  # POSTGRES_FEAST_PORT: "5432"
-  # POSTGRES_FEAST_DB: "feast"
-  # POSTGRES_FEAST_USER: "feast"
-  # POSTGRES_FEAST_PASSWORD: "feast"
+  POSTGRES_FEAST_HOST: "postgres"
+  POSTGRES_FEAST_PORT: "5432"
+  POSTGRES_FEAST_DB: "feast"
+  POSTGRES_FEAST_USER: "feast"
 
 include:
   - local: .gitlab/ci/*.gitlab-ci.yml

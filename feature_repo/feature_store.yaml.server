@@ -19,17 +19,18 @@ offline_store:
 # Local online store (sqlite). Postgres is disabled for local runs; to use the
 # cluster Postgres online store, uncomment the block below and set the
 # POSTGRES_FEAST_* variables.
-online_store:
-  type: sqlite
-  path: data/online_store.db
-
 # online_store:
-#   type: postgres
-#   host: ${POSTGRES_FEAST_HOST}
-#   port: ${POSTGRES_FEAST_PORT}
-#   database: ${POSTGRES_FEAST_DB}
-#   db_schema: public
-#   user: ${POSTGRES_FEAST_USER}
-#   password: ${POSTGRES_FEAST_PASSWORD}
+  # type: sqlite
+  # path: data/online_store.db
+
+online_store:
+  type: postgres
+  host: ${POSTGRES_FEAST_HOST}
+  port: ${POSTGRES_FEAST_PORT}
+  database: ${POSTGRES_FEAST_DB}
+  db_schema: public
+  user: ${POSTGRES_FEAST_USER}
+  password: ${POSTGRES_FEAST_PASSWORD}
+  sslmode: disable
 
 entity_key_serialization_version: 3
