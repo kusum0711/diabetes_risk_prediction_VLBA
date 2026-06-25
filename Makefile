@@ -26,7 +26,7 @@ help:
 	@echo "  make test          - pytest over $(TEST_PATH)"
 	@echo "  make build-image   - docker buildx build -t \$$(CI_IMAGE) ."
 	@echo "  make push-image    - docker push \$$(CI_IMAGE)"
-	@echo "  make prepare       - pythondiabetes-api -m src.main prepare"
+	@echo "  make prepare       - python -m src.main prepare"
 	@echo "  make train         - python -m src.main train"
 	@echo "  make online-infer  - python -m src.main online-infer"
 	@echo ""

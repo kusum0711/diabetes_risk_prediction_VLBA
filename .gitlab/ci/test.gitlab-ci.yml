@@ -29,10 +29,11 @@ test:
       prefix: test-pip
       files:
         - requirements.txt
+        - requirements-dev.txt
     paths:
       - .cache/pip
   script:
-    - pip install -r requirements.txt
+    - pip install -r requirements-dev.txt
     - echo "Running test suite in parallel (race mode)..."
     - make test
     - echo "Tests completed."

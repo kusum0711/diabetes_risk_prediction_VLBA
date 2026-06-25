@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Testing
+pytest
+pytest-cov
+pytest-xdist
+
+# Linting
+flake8
+
+# Notebooks / EDA
+seaborn

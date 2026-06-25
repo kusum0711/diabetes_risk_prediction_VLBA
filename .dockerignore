@@ -23,3 +23,13 @@ venv/
 
 .gitlab-ci-local/
 .claude/*
+
+mlruns/
+mlartifacts/
+local/
+.gitlab/
+Makefile
+*.md
+*.pkl
+*.joblib
+feature_repo/data/

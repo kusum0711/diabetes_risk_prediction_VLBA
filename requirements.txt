@@ -3,7 +3,6 @@ numpy
 pandas
 scikit-learn
 matplotlib
-seaborn
 pyarrow
 xgboost
 imbalanced-learn
@@ -27,11 +26,3 @@ uvicorn[standard]
 
 # Pipeline
 joblib
-
-# Testing
-pytest
-pytest-cov
-pytest-xdist
-
-# Linting
-flake8
