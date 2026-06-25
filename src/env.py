@@ -8,7 +8,7 @@ import os
 MLFLOW_TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI")
 
 # Model serving
-MODEL_NAME    = os.environ.get("MODEL_NAME", "diabetes_random_forest")
+MODEL_NAME = os.environ.get("MODEL_NAME", "diabetes_random_forest")
 MODEL_VERSION = os.environ.get("MODEL_VERSION", "latest")
 
 # API server
@@ -19,13 +19,13 @@ API_PORT = int(os.environ.get("API_PORT", "8000"))
 PUSHGATEWAY_URL = os.environ.get("PUSHGATEWAY_URL", "").strip()
 
 # Feast
-FEAST_URL          = os.environ.get("FEAST_URL", "http://localhost:6000")
+FEAST_URL = os.environ.get("FEAST_URL", "http://localhost:6000")
 FEATURE_STORE_MODE = os.environ.get("FEATURE_STORE_MODE", "online").lower()
 
 # AWS / S3 (used by feast_utils and preprocess for custom S3-compatible endpoints)
-AWS_ENDPOINT_URL      = os.environ.get("AWS_ENDPOINT_URL")
-S3_ENDPOINT           = os.environ.get("S3_ENDPOINT")
-AWS_ACCESS_KEY_ID     = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_ENDPOINT_URL = os.environ.get("AWS_ENDPOINT_URL")
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT")
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 
 # Data

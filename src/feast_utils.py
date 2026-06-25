@@ -243,6 +243,7 @@ def get_training_data(
 
 FEATURE_COLS = [f.split(":", 1)[1] for f in FEATURES]
 
+
 def feature_store_mode():
     """Return the active feature store mode: 'online' or 'offline' (default).
 
