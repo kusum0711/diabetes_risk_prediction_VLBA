@@ -1,0 +1,18 @@
+# Force LF line endings on checkout for all text files.
+# On Windows, Git defaults to CRLF; CRLF inside Docker shell commands causes
+# /bin/sh to fail with "unexpected EOF" in Linux containers.
+* text=auto eol=lf
+
+# Explicitly mark binary files so git never touches their line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.db binary
+*.pkl binary
+*.parquet binary

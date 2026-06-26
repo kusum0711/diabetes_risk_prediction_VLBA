@@ -1,0 +1,18 @@
+# Prometheus scrape config for local dev.
+# Scrapes the Pushgateway, where the pipeline (src/metrics.py) pushes
+# training/inference metrics. honor_labels keeps the job/instance labels
+# the pushgateway received instead of overwriting them with "pushgateway".
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ["localhost:9091"]
+
+  # Prometheus scraping itself (optional, handy sanity check).
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

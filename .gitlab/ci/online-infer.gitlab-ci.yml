@@ -1,0 +1,12 @@
+online-infer:
+  stage: online-infer
+  image: ${CI_IMAGE}
+  needs:
+    - build-images
+    - train
+  script:
+    - echo "Materializing features into the online store..."
+    # Materializes features into the online store (via the Feast server in
+    # online mode). Predictions are served separately by the prediction API.
+    - make online-infer
+    - echo "Online store materialization completed."

@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 from src.config import load_config
+from src.feast_utils import _s3_storage_options
+from src.env import RAW_DATA_PATH
 
 config = load_config()
 RAW_PATH = Path(config["data"]["raw_path"])
@@ -39,12 +41,25 @@ VALID_RANGES = {
 DOMAIN_MISSING_VALUES = {"BMI": 0}
 
 # load data
-def load_data(path: Path = RAW_PATH) -> pd.DataFrame:
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
 
-    df = pd.read_csv(path)
-    print(f"Loaded data from {path}")
+
+def load_data(path=None) -> pd.DataFrame:
+    if path is None:
+        path = RAW_DATA_PATH or str(RAW_PATH)
+
+    path_str = str(path)
+
+    if path_str.startswith("s3://"):
+        print(f"Loading raw data from S3: {path_str}")
+        df = pd.read_csv(path_str, storage_options=_s3_storage_options())
+    else:
+        print(f"Loading raw data from local path: {path_str}")
+        p = Path(path_str)
+        if not p.exists():
+            raise FileNotFoundError(f"File not found: {p}")
+        df = pd.read_csv(p)
+
+    print(f"Loaded data from {path_str}")
     print(f"Shape: {df.shape}")
     return df
 
@@ -115,6 +130,7 @@ def check_duplicates(df: pd.DataFrame) -> dict:
             "duplicate_percentage": round((duplicate_count / total_rows) * 100, 2) if total_rows else 0,
         },
     )
+
 
 def validate_data(df: pd.DataFrame, raise_error: bool = False) -> pd.DataFrame:
     checks = [

@@ -3,13 +3,16 @@ numpy
 pandas
 scikit-learn
 matplotlib
-seaborn
 pyarrow
 xgboost
 imbalanced-learn
 
 # Feature Store
-feast
+feast[postgres,aws]
+
+# Object store (S3 / Garage / MinIO) access
+boto3
+s3fs
 
 # Config
 pyyaml
@@ -17,9 +20,9 @@ pyyaml
 # MLflow
 mlflow==2.22.0
 
+# Prediction API
+fastapi
+uvicorn[standard]
+
 # Pipeline
 joblib
-
-# Testing
-pytest
-pytest-cov

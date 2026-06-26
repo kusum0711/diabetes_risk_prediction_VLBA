@@ -1,0 +1,258 @@
+# Local stand-ins for the university cluster services. Uses host networking
+# (no custom network) so everything is reachable on localhost; the pipeline jobs
+# run with `gitlab-ci-local --network host` and reach the same localhost ports.
+#
+#   make up           # docker compose up -d                          (bring up the infra, used by gitlab-ci-local)
+#   make build-feast  # docker compose build feast                    (build the feast server image)
+#   make app          # docker compose --profile app up diabetes-app  (run the app pipeline locally)
+#
+# See the Makefile for these and the `lint`/`test` targets used by the CI pipeline.
+#
+# The diabetes-app service is behind the `app` profile, so a plain `up -d`
+# brings up ONLY the infra (what gitlab-ci-local connects to on localhost) and
+# does not kick off the pipeline. Run the app explicitly with the command above.
+#
+# NOTE: on the cluster, services are reached by hostname (mlflow:5000, etc.);
+# locally they are on localhost. Only the URLs in .gitlab-ci.yml differ.
+
+x-s3-env: &s3-env
+  AWS_ACCESS_KEY_ID: minioadmin
+  AWS_SECRET_ACCESS_KEY: minioadmin
+  AWS_REGION: garage
+  AWS_DEFAULT_REGION: garage
+  AWS_ENDPOINT_URL: http://localhost:3900
+  AWS_ENDPOINT_URL_S3: http://localhost:3900
+  S3_ENDPOINT: http://localhost:3900
+
+x-diabetes-env: &diabetes-env
+  MLFLOW_TRACKING_URI: http://localhost:5050
+  FEAST_URL: ${FEAST_URL:-http://localhost:6000}
+  FEAST_SOURCE_PATH: s3://feast/diabetes_features.parquet
+  FEATURE_STORE_MODE: ${FEATURE_STORE_MODE:-sdk}
+  MODEL_NAME: ${MODEL_NAME:-diabetes_random_forest}
+  RAW_DATA_PATH: s3://datasets/diabetes.csv
+  PUSHGATEWAY_URL: http://localhost:9091
+
+services:
+
+  # S3-compatible object store (stands in for Garage). Feast registry + offline
+  # parquet live in the `feast` bucket; MLflow artifacts in the `mlflow` bucket.
+  garage:
+    image: minio/minio:latest
+    command: server /data --address ":3900" --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - garage-data:/data
+    network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3900/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  # One-shot: wait for the object store, then create the buckets and seed the raw dataset.
+  createbuckets:
+    image: minio/mc:latest
+    network_mode: host
+    depends_on:
+      garage:
+        condition: service_healthy
+    volumes:
+      - ../data/raw:/data/raw:ro
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://localhost:3900 minioadmin minioadmin; do echo 'waiting for garage'; sleep 2; done;
+      mc mb -p local/mlflow;
+      mc mb -p local/feast;
+      mc mb -p local/datasets;
+      mc cp /data/raw/diabetes.csv local/datasets/diabetes.csv;
+      echo 'buckets ready';
+      exit 0;
+      "
+
+  # MLflow tracking server (port 5050 — host 5000 is taken by the local docker
+  # registry); artifacts stored on the object store (s3://mlflow).
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    depends_on:
+      garage:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    environment:
+      # host.docker.internal reaches the garage container (network_mode: host)
+      # from this bridge-networked container on both Windows and Linux.
+      <<: *s3-env
+    command: >
+      /bin/sh -c "pip install --no-cache-dir boto3 >/dev/null 2>&1 &&
+      mlflow server --host 0.0.0.0 --port 5050
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root s3://mlflow"
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "5050:5050"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5050/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  # Feast online feature server (built from Dockerfile.feast).
+  feast:
+    build:
+      context: ..
+      dockerfile: local/Dockerfile.feast
+    image: ${FEAST_IMAGE:-team4-feast:local}
+    # Wait until the buckets exist (garage reachable). `feast apply` still needs
+    # the offline parquet, which the prepare stage produces; until then this
+    # container exits and is restarted by `restart: unless-stopped`.
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+    environment:
+      <<: *s3-env
+      FEAST_SOURCE_PATH: s3://feast/diabetes_features.parquet
+    # Apply (creates the sqlite online tables + S3 registry) then serve, so the
+    # online store the server reads is the same one it materializes into.
+    command: >
+      /bin/sh -c "mkdir -p /app/feature_repo/data &&
+      feast -c feature_repo apply &&
+      feast -c feature_repo serve -h 0.0.0.0 -p 6000"
+    restart: unless-stopped
+    network_mode: host
+    healthcheck:
+      # TCP-connect check: succeeds once `feast serve` is accepting on :6000.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 6000), timeout=3).close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    network_mode: host
+
+  # Scrapes the pushgateway (localhost:9091) every few seconds and stores the
+  # metrics. UI on http://localhost:9090.
+  prometheus:
+    image: prom/prometheus:latest
+    depends_on:
+      pushgateway:
+        condition: service_started
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    network_mode: host
+    restart: unless-stopped
+
+  # Dashboards on http://localhost:3000 (login admin / admin). The Prometheus
+  # datasource is auto-provisioned from monitoring/grafana/datasources.yml.
+  grafana:
+    # Grafana 12.4 — exposes the GA app-platform dashboard API
+    # (dashboard.grafana.app/v2) and the working classic→v2 backend conversion,
+    # matching the server. The -ubuntu (glibc) variant is used because the
+    # default Alpine image fails to start on this WSL2 kernel (libreadline
+    # symbol relocation errors in /run.sh).
+    image: grafana/grafana:12.4.4-ubuntu
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # Enable the app-platform dashboard API + v2 schema (dashboard.grafana.app/v2),
+      # so file provisioning ingests the v2-layout dashboards (matches the server).
+      GF_FEATURE_TOGGLES_ENABLE: "kubernetesDashboards,dashboardNewLayouts"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    network_mode: host
+    restart: unless-stopped
+
+  diabetes-app:
+    # Behind the `app` profile so a plain `docker compose up -d` brings up only
+    # the infra (what gitlab-ci-local uses) without running the pipeline.
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    # Wait for the infra the prepare+train pipeline actually uses: buckets
+    # created (garage ready) and MLflow serving. The Feast SERVER is NOT a
+    # dependency — prepare uses a local `feast apply` + offline S3 reads, and
+    # it is prepare that produces the parquet the feast server needs to start.
+    # Depending on feast here would deadlock (feast healthy ⇐ parquet ⇐ prepare).
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      pushgateway:
+        condition: service_started
+    environment:
+      <<: [*s3-env, *diabetes-env]
+    network_mode: host
+
+  # Online-infer stage: mirrors the CI online-infer job. Materializes Feast
+  # features into the SQLite online store and verifies end-to-end prediction.
+  # Run after `make run` (prepare+train) has completed.
+  # The feast-online-data volume is shared with diabetes-api so the materialized
+  # store written here is immediately visible to the prediction API.
+  diabetes-online-infer:
+    profiles: ["infer"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      pushgateway:
+        condition: service_started
+    environment:
+      <<: [*s3-env, *diabetes-env]
+    command: python -m src.main online-infer
+    volumes:
+      - feast-online-data:/app/feature_repo/data
+    network_mode: host
+
+  # Prediction API: reads patient features from the feast parquet on the object
+  # store, loads the registered MLflow model, and serves predictions on :8000.
+  # Behind the `api` profile so a plain `up -d` doesn't start it. Requires the
+  # train pipeline to have registered a model and prepare to have written the
+  # parquet. Docs at http://localhost:8000/docs once running.
+  diabetes-api:
+    profiles: ["api"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      createbuckets:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+    environment:
+      <<: [*s3-env, *diabetes-env]
+      MODEL_VERSION: ${MODEL_VERSION:-latest}
+    command: python -m src.main api
+    # Persist the Feast registry + sqlite online store across restarts so a
+    # materialized store survives container recreation.
+    volumes:
+      - feast-online-data:/app/feature_repo/data
+    network_mode: host
+    restart: unless-stopped
+
+volumes:
+  garage-data:
+  mlflow-data:
+  prometheus-data:
+  grafana-data:
+  feast-online-data:
