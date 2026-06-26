@@ -4,7 +4,7 @@ An end-to-end MLOps system for predicting diabetes risk.
 
 ## What It Does
 
-This project trains and serves a binary classifier that predicts whether a patient has diabetes or is at risk, based on 21 health indicators.
+This project trains and serves a binary classifier that predicts whether a patient has diabetes or is at risk, based on health indicators.
 
 
 ## Pipeline Flow
@@ -18,8 +18,8 @@ Data Preparation
     │
     ▼
 Feature Store (Feast)
- ├── Offline Store (S3)      → used for training
- └── Online Store (Postgres) → used for inference
+ ├── Offline Store (S3)      -> used for training
+ └── Online Store (Postgres) -> used for inference
     │
     ▼
 Model Training
@@ -39,10 +39,9 @@ Prometheus / Grafana Monitoring
 
 ```
 .
-├── data/                   # Raw and processed datasets
 ├── feature_repo/           # Feast feature definitions and configuration
 ├── src/                    # Data preparation, training, and inference code
-├── configs/                # Pipeline and model configuration
+├── configs/                # model configuration
 ├── local/                  # Local infrastructure (Docker Compose)
 ├── tests/                  # Unit and integration tests
 ├── reports/                # Generated metrics, plots, and confusion matrices
